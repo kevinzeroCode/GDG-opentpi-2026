@@ -18,7 +18,7 @@ const useDifyAPI = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer app-rCsGMbTJ9ervUOPkpf7OfZBH` 
+          'Authorization': `Bearer ${import.meta.env.VITE_DIFY_API_KEY}` 
         },
         body: JSON.stringify({
           inputs: {
