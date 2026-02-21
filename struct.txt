@@ -1,0 +1,21 @@
+QuantDashboard-AI/
+├── public/                 # 靜態資源（Logo, 圖示）
+├── src/
+│   ├── components/         # 可複用的組件
+│   │   ├── Chat/           # 對話視窗相關
+│   │   │   ├── ChatWindow.jsx    # 聊天主視窗
+│   │   │   └── MessageList.jsx   # 訊息列表
+│   │   ├── Dashboard/      # 右側儀表板組件
+│   │   │   ├── GaugeChart.jsx    # RSI 儀錶盤 (用 ApexCharts)
+│   │   │   ├── PriceCard.jsx     # 股價與均線卡片
+│   │   │   └── TrendBadge.jsx    # 多空趨勢標籤
+│   │   └── Layout/         # 頁面佈局 (左 6: 右 4 或 左 5: 右 5)
+│   ├── hooks/              # 自定義 Hook
+│   │   └── useDifyAPI.js   # 專門處理與 Dify API 的 Fetch 請求
+│   ├── utils/              # 工具函式
+│   │   └── parser.js       # 核心：解析 Dify 回傳字串並提取數字的 Regex
+│   ├── App.jsx             # 專案入口，協調 Chat 與 Dashboard 的資料流
+│   └── main.jsx
+├── .env                    # 存放 Dify API Key (重要：別上傳到 GitHub)
+├── tailwind.config.js      # 樣式配置
+└── package.json
