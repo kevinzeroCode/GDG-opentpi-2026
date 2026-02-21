@@ -16,7 +16,7 @@ const GaugeChart = ({ value }) => {
             offsetY: 10,
             fontSize: '32px',
             color: '#f8fafc',
-            formatter: (val) => val
+            formatter: (val) => val.toFixed(2)
           }
         }
       }
