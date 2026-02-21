@@ -1,0 +1,290 @@
+app:
+  description: 串接 FinMind 數據進行策略回測
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: workflow
+  name: 儀錶板測試
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/gemini:0.7.7@e12c712679171e20bacf59cd12e88efe8c2a508450cd23ce8424a91dc29353db
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: parameter-extractor
+      id: 1770907397757-source-1770907528913-target
+      selected: false
+      source: '1770907397757'
+      sourceHandle: source
+      target: '1770907528913'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parameter-extractor
+        targetType: http-request
+      id: 1770907528913-source-1770912568990-target
+      selected: false
+      source: '1770907528913'
+      sourceHandle: source
+      target: '1770912568990'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: 1770912568990-source-1771658568086-target
+      selected: false
+      source: '1770912568990'
+      sourceHandle: source
+      target: '1771658568086'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 1771658568086-source-1770909970504-target
+      selected: false
+      source: '1771658568086'
+      sourceHandle: source
+      target: '1770909970504'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 開始
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: query
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: query
+      height: 108
+      id: '1770907397757'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        instruction: 請從用戶的話中提取股票代號。如果是中文名稱（如台積電），請轉換為代號（2330）。
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: gemini-2.5-flash
+          provider: langgenius/gemini/google
+        parameters:
+        - description: ticker
+          name: ticker
+          required: false
+          type: string
+        query:
+        - '1770907397757'
+        - query
+        reasoning_mode: prompt
+        selected: false
+        title: 參數提取器
+        type: parameter-extractor
+        vision:
+          enabled: false
+      height: 87
+      id: '1770907528913'
+      position:
+        x: 382
+        y: 282
+      positionAbsolute:
+        x: 382
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector:
+          - '1771658568086'
+          - result
+          value_type: string
+          variable: ticker
+        selected: true
+        title: 輸出
+        type: end
+      height: 87
+      id: '1770909970504'
+      position:
+        x: 1720.3862652939106
+        y: 282
+      positionAbsolute:
+        x: 1720.3862652939106
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: []
+          type: none
+        headers: User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+          (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
+        method: get
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: HTTP 請求
+        type: http-request
+        url: https://query1.finance.yahoo.com/v8/finance/chart/{{#1770907528913.ticker#}}.TW?interval=1d&range=3mo
+        variables: []
+      height: 171
+      id: '1770912568990'
+      position:
+        x: 746
+        y: 282
+      positionAbsolute:
+        x: 746
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        code: "import json\nimport math\n\ndef main(arg1: str, **kwargs):\n    # 這是為了防錯：優先抓取\
+          \ arg1\n    raw_input = arg1 if arg1 else list(kwargs.values())[0]\n   \
+          \ \n    try:\n        data = json.loads(str(raw_input))\n        res = data['chart']['result'][0]\n\
+          \        indicators = res['indicators']['quote'][0]\n        prices = [p\
+          \ for p in indicators['close'] if p is not None]\n        \n        if len(prices)\
+          \ < 20:\n            return {\"result\": \"數據不足 20 筆\"}\n\n        # ---\
+          \ 計算指標 ---\n        ma5 = sum(prices[-5:]) / 5\n        ma20 = sum(prices[-20:])\
+          \ / 20\n        \n        deltas = [prices[i] - prices[i-1] for i in range(1,\
+          \ len(prices))]\n        gains = [d if d > 0 else 0 for d in deltas[-14:]]\n\
+          \        losses = [-d if d < 0 else 0 for d in deltas[-14:]]\n        rsi\
+          \ = 100 - (100 / (1 + (sum(gains)/14 + 1e-9) / (sum(losses)/14 + 1e-9)))\n\
+          \n        # 這裡的鍵名一定要叫 \"result\"，因為你的介面輸出變數叫 result\n        return {\n\
+          \            \"result\": f\"當前價: {prices[-1]}, RSI: {round(rsi, 2)}, MA5:\
+          \ {round(ma5, 2)}, 趨勢: {'多頭' if ma5 > ma20 else '空頭'}\"\n        }\n   \
+          \ except Exception as e:\n        return {\"result\": f\"計算錯誤: {str(e)}\"\
+          }"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 程式碼執行
+        type: code
+        variables:
+        - value_selector:
+          - '1770912568990'
+          - body
+          value_type: string
+          variable: arg1
+      height: 51
+      id: '1771658568086'
+      position:
+        x: 1147
+        y: 282
+      positionAbsolute:
+        x: 1147
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: -744.214426201064
+      y: 227.9320648055226
+      zoom: 0.8312378961427878
+  rag_pipeline_variables: []
