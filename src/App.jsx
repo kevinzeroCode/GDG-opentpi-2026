@@ -100,8 +100,8 @@ function App() {
           <>
             {/* 指標卡片群 */}
             <div className="grid grid-cols-2 gap-4">
-              <MetricBox label="目前價格" value={`$${metrics.price}`} subValue="Real-time" />
-              <MetricBox label="MA5 均線" value={metrics.ma5} />
+              <MetricBox label="目前價格" value={`$${metrics.price.toFixed(2)}`} subValue="Real-time" />
+              <MetricBox label="MA5 均線" value={metrics.ma5.toFixed(2)} />
               <div className="col-span-2 p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex justify-between items-center">
                 <span className="text-slate-400 text-sm">趨勢判斷</span>
                 <span className={`flex items-center gap-1 font-bold ${metrics.trend === '多頭' ? 'text-red-500' : 'text-green-500'}`}>
