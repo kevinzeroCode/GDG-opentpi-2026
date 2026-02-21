@@ -2,8 +2,16 @@ import React from 'react';
 import Chart from 'react-apexcharts';
 
 const GaugeChart = ({ value }) => {
+  // 💡 確保傳入的是數字，且給予預設值防止 0.00 鎖死
+  const chartValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+
   const options = {
-    chart: { type: 'radialBar', sparkline: { enabled: true } },
+    chart: { 
+      type: 'radialBar', 
+      sparkline: { enabled: true },
+      // 💡 增加動畫效果
+      animations: { enabled: true, easing: 'easeinout', speed: 800 }
+    },
     plotOptions: {
       radialBar: {
         startAngle: -110,
@@ -15,7 +23,9 @@ const GaugeChart = ({ value }) => {
           value: {
             offsetY: 10,
             fontSize: '32px',
+            fontWeight: '700',
             color: '#f8fafc',
+            // 💡 確保格式化小數點
             formatter: (val) => val.toFixed(2)
           }
         }
@@ -26,7 +36,7 @@ const GaugeChart = ({ value }) => {
       gradient: {
         shade: 'dark',
         type: 'horizontal',
-        gradientToColors: [value > 70 ? '#ef4444' : '#3b82f6'],
+        gradientToColors: [chartValue > 70 ? '#ef4444' : chartValue < 30 ? '#22c55e' : '#3b82f6'],
         stops: [0, 100]
       }
     },
@@ -34,7 +44,18 @@ const GaugeChart = ({ value }) => {
     labels: ['RSI'],
   };
 
-  return <Chart options={options} series={[value]} type="radialBar" height={280} />;
+  // 💡 給 Chart 一個動態 key，當數值改變時強制組件重新渲染
+  return (
+    <div className="w-full">
+      <Chart 
+        key={`rsi-chart-${chartValue}`} 
+        options={options} 
+        series={[chartValue]} 
+        type="radialBar" 
+        height={280} 
+      />
+    </div>
+  );
 };
 
 export default GaugeChart;
