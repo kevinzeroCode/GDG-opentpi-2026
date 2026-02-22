@@ -9,5 +9,6 @@ export default defineConfig({
     watch: {
       usePolling: true, // 確保檔案變動會自動更新
     },
+    // API proxy 已由 DigiRunner (port 31080) 統一管理
   },
 })
