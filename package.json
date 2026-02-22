@@ -11,6 +11,7 @@
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.0",
     "apexcharts": "^4.0.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-apexcharts": "^1.7.0",
