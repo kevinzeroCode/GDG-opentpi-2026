@@ -6,6 +6,7 @@ import KDChart from './components/Dashboard/KDChart';
 import MACDChart from './components/Dashboard/MACDChart';
 import HistoryChart from './components/Dashboard/HistoryChart';
 import PriceChart from './components/Dashboard/PriceChart';
+import CandlestickChart from './components/Dashboard/CandlestickChart';
 import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2 } from 'lucide-react';
 import Chart from 'react-apexcharts';
 import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares } from './utils/watchlist';
@@ -312,6 +313,9 @@ function App() {
 
                   {/* Price Chart */}
                   <PriceChart ticker={lastTicker} />
+
+                  {/* Candlestick Chart */}
+                  <CandlestickChart ticker={lastTicker} />
                 </div>
               )}
 
