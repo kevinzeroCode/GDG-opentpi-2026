@@ -240,22 +240,41 @@ workflow:
       type: custom
       width: 241
     - data:
-        code: "import json\nimport math\n\ndef main(arg1: str, **kwargs):\n    # 這是為了防錯：優先抓取\
-          \ arg1\n    raw_input = arg1 if arg1 else list(kwargs.values())[0]\n   \
-          \ \n    try:\n        data = json.loads(str(raw_input))\n        res = data['chart']['result'][0]\n\
+        code: "import json\nimport math\n\ndef main(arg1: str, **kwargs):\n    raw_input\
+          \ = arg1 if arg1 else list(kwargs.values())[0]\n    \n    try:\n        data\
+          \ = json.loads(str(raw_input))\n        res = data['chart']['result'][0]\n\
           \        indicators = res['indicators']['quote'][0]\n        prices = [p\
-          \ for p in indicators['close'] if p is not None]\n        \n        if len(prices)\
-          \ < 20:\n            return {\"result\": \"數據不足 20 筆\"}\n\n        # ---\
-          \ 計算指標 ---\n        ma5 = sum(prices[-5:]) / 5\n        ma20 = sum(prices[-20:])\
-          \ / 20\n        \n        deltas = [prices[i] - prices[i-1] for i in range(1,\
-          \ len(prices))]\n        gains = [d if d > 0 else 0 for d in deltas[-14:]]\n\
-          \        losses = [-d if d < 0 else 0 for d in deltas[-14:]]\n        rsi\
-          \ = 100 - (100 / (1 + (sum(gains)/14 + 1e-9) / (sum(losses)/14 + 1e-9)))\n\
-          \n        # 這裡的鍵名一定要叫 \"result\"，因為你的介面輸出變數叫 result\n        return {\n\
-          \            \"result\": f\"當前價: {prices[-1]}, RSI: {round(rsi, 2)}, MA5:\
-          \ {round(ma5, 2)}, 趨勢: {'多頭' if ma5 > ma20 else '空頭'}\"\n        }\n   \
-          \ except Exception as e:\n        return {\"result\": f\"計算錯誤: {str(e)}\"\
-          }"
+          \ for p in indicators['close'] if p is not None]\n        highs = [h for\
+          \ h in indicators['high'] if h is not None]\n        lows = [l for l in\
+          \ indicators['low'] if l is not None]\n        \n        if len(prices) <\
+          \ 26:\n            return {\"result\": \"數據不足 26 筆\"}\n\n        # --- MA\
+          \ ---\n        ma5 = sum(prices[-5:]) / 5\n        ma20 = sum(prices[-20:])\
+          \ / 20\n        \n        # --- RSI ---\n        deltas = [prices[i] - prices[i-1]\
+          \ for i in range(1, len(prices))]\n        gains = [d if d > 0 else 0 for\
+          \ d in deltas[-14:]]\n        losses = [-d if d < 0 else 0 for d in deltas[-14:]]\n\
+          \        rsi = 100 - (100 / (1 + (sum(gains)/14 + 1e-9) / (sum(losses)/14\
+          \ + 1e-9)))\n\n        # --- KD ---\n        lowest_low = min(lows[-9:])\n\
+          \        highest_high = max(highs[-9:])\n        k_value = (prices[-1] -\
+          \ lowest_low) / (highest_high - lowest_low + 1e-9) * 100\n        k_values\
+          \ = []\n        for i in range(3):\n            idx = -(i + 1)\n         \
+          \   ll = min(lows[-9+idx:len(lows)+idx]) if len(lows)+idx >= 9 else min(lows[:len(lows)+idx])\n\
+          \            hh = max(highs[-9+idx:len(highs)+idx]) if len(highs)+idx >=\
+          \ 9 else max(highs[:len(highs)+idx])\n            k_val = (prices[idx-1]\
+          \ - ll) / (hh - ll + 1e-9) * 100\n            k_values.append(k_val)\n \
+          \       d_value = sum(k_values) / 3\n\n        # --- MACD ---\n        def\
+          \ ema(data, period):\n            multiplier = 2 / (period + 1)\n         \
+          \   result = [data[0]]\n            for price in data[1:]:\n             \
+          \   result.append((price - result[-1]) * multiplier + result[-1])\n      \
+          \      return result\n        ema12 = ema(prices, 12)\n        ema26 = ema(prices,\
+          \ 26)\n        macd_line = ema12[-1] - ema26[-1]\n        macd_hist_full\
+          \ = [e12 - e26 for e12, e26 in zip(ema12[-26:], ema26[-26:])]\n        signal_line\
+          \ = ema(macd_hist_full, 9)[-1]\n        histogram = macd_line - signal_line\n\
+          \n        trend = '多頭' if ma5 > ma20 else '空頭'\n        return {\n     \
+          \       \"result\": f\"當前價: {prices[-1]}, RSI: {round(rsi, 2)}, MA5: {round(ma5,\
+          \ 2)}, K值: {round(k_value, 2)}, D值: {round(d_value, 2)}, MACD: {round(macd_line,\
+          \ 2)}, Signal: {round(signal_line, 2)}, Histogram: {round(histogram, 2)},\
+          \ 趨勢: {trend}\"\n        }\n    except Exception as e:\n        return {\"result\"\
+          : f\"計算錯誤: {str(e)}\"}"
         code_language: python3
         outputs:
           result:
