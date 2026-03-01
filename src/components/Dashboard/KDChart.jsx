@@ -11,10 +11,10 @@ const KDChart = ({ k, d }) => {
   };
 
   const getCrossSignal = () => {
-    if (kVal > dVal && kVal < 30) return { text: '黃金交叉', color: 'text-yellow-400' };
-    if (kVal < dVal && kVal > 70) return { text: '死亡交叉', color: 'text-red-400' };
-    if (kVal > dVal) return { text: 'K > D 多方', color: 'text-green-400' };
-    return { text: 'K < D 空方', color: 'text-red-400' };
+    if (kVal > dVal && kVal < 30) return { text: '黃金交叉', color: 'text-red-400' };
+    if (kVal < dVal && kVal > 70) return { text: '死亡交叉', color: 'text-green-400' };
+    if (kVal > dVal) return { text: 'K > D 多方', color: 'text-red-400' };
+    return { text: 'K < D 空方', color: 'text-green-400' };
   };
 
   const status = getStatus(kVal);

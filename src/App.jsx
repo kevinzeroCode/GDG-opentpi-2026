@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import useDifyAPI from './hooks/useDifyAPI';
+import useTWSELive from './hooks/useTWSELive';
 import GaugeChart from './components/Dashboard/GaugeChart';
 import KDChart from './components/Dashboard/KDChart';
 import MACDChart from './components/Dashboard/MACDChart';
@@ -9,10 +10,12 @@ import PriceChart from './components/Dashboard/PriceChart';
 import CandlestickChart from './components/Dashboard/CandlestickChart';
 import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2 } from 'lucide-react';
 import Chart from 'react-apexcharts';
-import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares } from './utils/watchlist';
+import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares, updateAvgCost } from './utils/watchlist';
 import { getHistory } from './utils/history';
-import { getAlerts, saveAlert, removeAlert, checkAlerts } from './utils/alerts';
-import { getTickerLabel, getTickerShort } from './utils/tickerNames';
+import { getAlerts, saveAlert, removeAlert, checkAlerts, markAlertFired, resetAlert } from './utils/alerts';
+import { getAlertEmail, setAlertEmail, sendAlertEmail } from './utils/emailAlert';
+import { fetchTWSELive } from './utils/twseLive';
+import { getTickerLabel, getTickerShort, resolveToTicker } from './utils/tickerNames';
 import { generateCommentary } from './utils/commentary';
 
 function App() {
@@ -63,21 +66,37 @@ function App() {
     setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
     setInput('');
 
-    await fetchStockAnalysis(userQuery);
+    // 偵測輸入中所有股票代號（4~6位數字），支援多股同時查詢
+    const tickers = [...new Set(userQuery.match(/\d{4,6}/g) || [])];
+    if (tickers.length > 1) {
+      for (const ticker of tickers) {
+        await fetchStockAnalysis(ticker);
+      }
+    } else {
+      // 嘗試將中文名稱解析為代號（如「台玻」→「1802」）
+      await fetchStockAnalysis(resolveToTicker(userQuery));
+    }
   };
 
   useEffect(() => {
     if (analysisResult) {
-      const commentary = generateCommentary(lastTicker, analysisResult.metrics) || analysisResult.rawText;
+      const commentary = analysisResult.commentary
+        || generateCommentary(lastTicker, analysisResult.metrics)
+        || analysisResult.rawText;
       setMessages(prev => [...prev, { role: 'bot', content: commentary }]);
-      // Check alerts
+      // Check alerts (only for stock queries with real metrics)
       if (analysisResult.metrics && lastTicker) {
         const hits = checkAlerts(lastTicker, analysisResult.metrics);
         if (hits.length > 0) {
           setTriggeredAlerts(hits);
-          if ('Notification' in window && Notification.permission === 'granted') {
-            hits.forEach((h) => new Notification('QuantDashboard 警報', { body: h.message }));
-          }
+          hits.forEach((h) => {
+            markAlertFired(h.id);
+            alertTick((n) => n + 1);
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('QuantDashboard 警報', { body: h.message });
+            }
+            sendAlertEmail(lastTicker, h.message);
+          });
         }
       }
     }
@@ -97,9 +116,9 @@ function App() {
     }
   }, []);
 
-  const handleAddAlert = (indicator, operator, value) => {
-    if (!lastTicker) return;
-    saveAlert({ ticker: lastTicker, indicator, operator, value: Number(value) });
+  const handleAddAlert = (ticker, indicator, operator, value) => {
+    if (!ticker) return;
+    saveAlert({ ticker, indicator, operator, value: Number(value) });
     alertTick((n) => n + 1);
   };
 
@@ -108,7 +127,44 @@ function App() {
     alertTick((n) => n + 1);
   };
 
+  const handleResetAlert = (id) => {
+    resetAlert(id);
+    alertTick((n) => n + 1);
+  };
+
   const metrics = analysisResult?.metrics;
+  const { data: liveData, error: liveError } = useTWSELive(lastTicker);
+
+  // 背景自動輪詢：每 5 秒對所有有 PRICE 警報的股票查詢即時價格並比對
+  useEffect(() => {
+    const runCheck = async () => {
+      const active = getAlerts().filter((a) => a.enabled && !a.firedAt && a.indicator === 'price');
+      const tickers = [...new Set(active.map((a) => a.ticker))];
+      for (const t of tickers) {
+        try {
+          const live = await fetchTWSELive(t);
+          if (!live?.last) continue;
+          const hits = checkAlerts(t, { price: live.last });
+          if (hits.length > 0) {
+            setTriggeredAlerts((prev) => [...prev, ...hits]);
+            hits.forEach((h) => {
+              markAlertFired(h.id);
+              alertTick((n) => n + 1);
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('QuantDashboard 警報', { body: h.message });
+              }
+              sendAlertEmail(t, h.message);
+            });
+          }
+        } catch {
+          // 盤後 / 無資料時靜默忽略
+        }
+      }
+    };
+    runCheck();
+    const id = setInterval(runCheck, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const getCompositeSignal = () => {
     if (!metrics) return null;
@@ -265,69 +321,17 @@ function App() {
               onToggle={toggleWatchlist}
               onSetInput={setInput}
               onSharesChange={(ticker, shares) => { updateShares(ticker, shares); watchlistTick((n) => n + 1); }}
+              onAvgCostChange={(ticker, cost) => { updateAvgCost(ticker, cost); watchlistTick((n) => n + 1); }}
             />
           ) : activeTab === 2 ? (
             <HistoryChart ticker={lastTicker} />
-          ) : metrics ? (
-            <>
-              {activeTab === 0 && (
-                <div className="flex flex-col gap-4">
-                  {/* Metric Cards */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-2xl relative">
-                      <div className="text-slate-500 text-xs mb-1 font-medium">目前價格</div>
-                      <div className="text-xl font-bold font-mono text-slate-100">${metrics.price.toFixed(2)}</div>
-                      <div className="text-[10px] text-slate-600">Real-time</div>
-                      {lastTicker && (
-                        <button onClick={() => toggleWatchlist(lastTicker)} className="absolute top-3 right-3">
-                          <Star size={14} className={isInWatchlist(lastTicker) ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600 hover:text-yellow-400'} />
-                        </button>
-                      )}
-                    </div>
-                    <MetricBox label="MA5 均線" value={metrics.ma5.toFixed(2)} />
-                    <div className="col-span-2 p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex justify-between items-center">
-                      <span className="text-slate-400 text-sm">趨勢判斷</span>
-                      <span className={`flex items-center gap-1 font-bold ${metrics.trend === '多頭' ? 'text-red-500' : 'text-green-500'}`}>
-                        <TrendingUp size={16} /> {metrics.trend}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* RSI Gauge */}
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-3xl p-6 flex flex-col items-center shadow-inner">
-                    <span className="text-slate-400 text-sm mb-2 font-medium">RSI 強度分析</span>
-                    <GaugeChart value={metrics.rsi} />
-                    <div className="mt-4 flex gap-4 w-full">
-                      <div className="flex-1 text-center border-r border-slate-700">
-                        <div className="text-xs text-slate-500 uppercase">RSI Value</div>
-                        <div className="text-xl font-mono font-bold text-blue-400">{metrics.rsi}</div>
-                      </div>
-                      <div className="flex-1 text-center">
-                        <div className="text-xs text-slate-500 uppercase">Status</div>
-                        <div className={`text-sm font-bold mt-1 ${metrics.rsi > 70 ? 'text-red-400' : metrics.rsi < 30 ? 'text-green-400' : 'text-slate-300'}`}>
-                          {metrics.rsi > 70 ? '超買' : metrics.rsi < 30 ? '超賣' : '中性'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Price Chart */}
-                  <PriceChart ticker={lastTicker} />
-
-                  {/* Candlestick Chart */}
-                  <CandlestickChart ticker={lastTicker} />
-                </div>
-              )}
-
-              {activeTab === 1 && (
-                <div className="flex flex-col gap-4">
-                  {/* KD Chart */}
+          ) : activeTab === 1 ? (
+            <div className="flex flex-col gap-4">
+              {/* KD / MACD / 綜合訊號：有資料才顯示 */}
+              {metrics && (
+                <>
                   <KDChart k={metrics.k} d={metrics.d} />
-
-                  {/* MACD Chart */}
                   <MACDChart macd={metrics.macd} signal={metrics.signal} histogram={metrics.histogram} />
-
-                  {/* Composite Signal */}
                   {(() => {
                     const sig = getCompositeSignal();
                     if (!sig) return null;
@@ -339,18 +343,68 @@ function App() {
                       </div>
                     );
                   })()}
-
-                  {/* Alert Setup */}
-                  <AlertPanel
-                    ticker={lastTicker}
-                    alerts={alerts}
-                    triggeredAlerts={triggeredAlerts}
-                    onAdd={handleAddAlert}
-                    onRemove={handleRemoveAlert}
-                  />
-                </div>
+                </>
               )}
-            </>
+              {/* 警示面板：永遠顯示 */}
+              <AlertPanel
+                ticker={lastTicker}
+                alerts={alerts}
+                triggeredAlerts={triggeredAlerts}
+                onAdd={handleAddAlert}
+                onRemove={handleRemoveAlert}
+                onReset={handleResetAlert}
+              />
+            </div>
+          ) : metrics ? (
+            <div className="flex flex-col gap-4">
+              {/* Metric Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-2xl relative">
+                  <div className="text-slate-500 text-xs mb-1 font-medium">目前價格</div>
+                  <div className="text-xl font-bold font-mono text-slate-100">${metrics.price.toFixed(2)}</div>
+                  <div className="text-[10px] text-slate-600">Real-time</div>
+                  {lastTicker && (
+                    <button onClick={() => toggleWatchlist(lastTicker)} className="absolute top-3 right-3">
+                      <Star size={14} className={isInWatchlist(lastTicker) ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600 hover:text-yellow-400'} />
+                    </button>
+                  )}
+                </div>
+                <MetricBox label="MA5 均線" value={metrics.ma5.toFixed(2)} />
+                <div className="col-span-2 p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex justify-between items-center">
+                  <span className="text-slate-400 text-sm">趨勢判斷</span>
+                  <span className={`flex items-center gap-1 font-bold ${metrics.trend === '多頭' ? 'text-red-500' : 'text-green-500'}`}>
+                    <TrendingUp size={16} /> {metrics.trend}
+                  </span>
+                </div>
+              </div>
+
+              {/* Live Price Card */}
+              <LivePriceCard data={liveData} error={liveError} />
+
+              {/* RSI Gauge */}
+              <div className="bg-slate-800/50 border border-slate-700 rounded-3xl p-6 flex flex-col items-center shadow-inner">
+                <span className="text-slate-400 text-sm mb-2 font-medium">RSI 強度分析</span>
+                <GaugeChart value={metrics.rsi} />
+                <div className="mt-4 flex gap-4 w-full">
+                  <div className="flex-1 text-center border-r border-slate-700">
+                    <div className="text-xs text-slate-500 uppercase">RSI Value</div>
+                    <div className="text-xl font-mono font-bold text-blue-400">{metrics.rsi}</div>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <div className="text-xs text-slate-500 uppercase">Status</div>
+                    <div className={`text-sm font-bold mt-1 ${metrics.rsi > 70 ? 'text-red-400' : metrics.rsi < 30 ? 'text-green-400' : 'text-slate-300'}`}>
+                      {metrics.rsi > 70 ? '超買' : metrics.rsi < 30 ? '超賣' : '中性'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Price Chart */}
+              <PriceChart ticker={lastTicker} />
+
+              {/* Candlestick Chart */}
+              <CandlestickChart ticker={lastTicker} liveData={liveData} />
+            </div>
           ) : loading ? (
             <div className="flex flex-col gap-4 animate-pulse">
               <div className="grid grid-cols-2 gap-3">
@@ -380,17 +434,45 @@ const INDICATORS = [
   { value: 'price', label: '價格' },
 ];
 
-const AlertPanel = ({ ticker, alerts, triggeredAlerts, onAdd, onRemove }) => {
+const AlertPanel = ({ ticker, alerts, triggeredAlerts, onAdd, onRemove, onReset }) => {
+  const [alertTicker, setAlertTicker] = useState(ticker || '');
   const [indicator, setIndicator] = useState('rsi');
   const [operator, setOperator] = useState('>');
   const [value, setValue] = useState('');
-  const tickerAlerts = alerts.filter((a) => a.ticker === ticker);
+  const [email, setEmail] = useState(getAlertEmail());
+  const [emailSaved, setEmailSaved] = useState(false);
+
+  // 當外部 ticker 更新時同步
+  React.useEffect(() => { if (ticker) setAlertTicker(ticker); }, [ticker]);
+
+  const handleSaveEmail = () => {
+    setAlertEmail(email);
+    setEmailSaved(true);
+    setTimeout(() => setEmailSaved(false), 2000);
+  };
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <Bell size={14} className="text-amber-400" />
         <span className="text-xs text-slate-400 uppercase font-medium">智慧警報</span>
+      </div>
+
+      {/* Email input */}
+      <div className="flex items-center gap-1.5 mb-3">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="輸入警報信箱..."
+          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-amber-500 placeholder:text-slate-500"
+        />
+        <button
+          onClick={handleSaveEmail}
+          className={`text-xs px-2 py-1 rounded-lg transition-colors font-medium ${emailSaved ? 'bg-green-600 text-white' : 'bg-amber-600 hover:bg-amber-500 text-white'}`}
+        >
+          {emailSaved ? '已儲存' : '儲存'}
+        </button>
       </div>
 
       {/* Triggered alerts */}
@@ -405,37 +487,60 @@ const AlertPanel = ({ ticker, alerts, triggeredAlerts, onAdd, onRemove }) => {
       )}
 
       {/* Add alert form */}
-      <div className="flex items-center gap-1.5 mb-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        <input
+          value={alertTicker}
+          onChange={(e) => setAlertTicker(e.target.value.toUpperCase())}
+          placeholder="代號"
+          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none w-16 font-mono"
+        />
         <select value={indicator} onChange={(e) => setIndicator(e.target.value)}
-          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none">
+          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none flex-1">
           {INDICATORS.map((ind) => <option key={ind.value} value={ind.value}>{ind.label}</option>)}
         </select>
+      </div>
+      <div className="flex items-center gap-1.5 mb-3">
         <select value={operator} onChange={(e) => setOperator(e.target.value)}
-          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none w-12">
+          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none w-16">
           <option value=">">&gt;</option>
           <option value="<">&lt;</option>
+          <option value="=">=</option>
         </select>
         <input type="number" value={value} onChange={(e) => setValue(e.target.value)} placeholder="值"
-          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none w-16" />
+          className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none flex-1" />
         <button
-          onClick={() => { if (value) { onAdd(indicator, operator, value); setValue(''); } }}
+          onClick={() => { if (value && alertTicker) { onAdd(alertTicker, indicator, operator, value); setValue(''); } }}
           className="bg-amber-600 hover:bg-amber-500 text-white p-1 rounded-lg transition-colors"
         >
           <Plus size={14} />
         </button>
       </div>
 
-      {/* Existing alerts */}
-      {tickerAlerts.length === 0 ? (
-        <p className="text-[10px] text-slate-600">尚未設定警報</p>
+      {/* All alerts grouped by ticker */}
+      {alerts.length === 0 ? (
+        <p className="text-[10px] text-slate-600">尚未設定任何警報</p>
       ) : (
-        <div className="space-y-1">
-          {tickerAlerts.map((a) => (
-            <div key={a.id} className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/50 px-2 py-1 rounded-lg">
-              <span>{a.indicator.toUpperCase()} {a.operator} {a.value}</span>
-              <button onClick={() => onRemove(a.id)} className="text-slate-600 hover:text-red-400">
-                <Trash2 size={12} />
-              </button>
+        <div className="space-y-2">
+          {/* Group by ticker */}
+          {[...new Set(alerts.map((a) => a.ticker))].map((t) => (
+            <div key={t}>
+              <div className="text-[10px] text-slate-500 font-medium mb-1">{t}</div>
+              {alerts.filter((a) => a.ticker === t).map((a) => (
+                <div key={a.id} className={`flex items-center justify-between text-xs px-2 py-1.5 rounded-lg mb-1 ${a.firedAt ? 'bg-slate-900/30 text-slate-600' : 'bg-slate-900/50 text-slate-400'}`}>
+                  <div className="flex items-center gap-1.5">
+                    {a.firedAt && <span className="text-[9px] text-amber-500 border border-amber-700/50 rounded px-1">已觸發</span>}
+                    <span>{a.indicator.toUpperCase()} {a.operator} {a.value}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {a.firedAt && (
+                      <button onClick={() => { onReset(a.id); }} className="text-[9px] text-blue-500 hover:text-blue-400 px-1">重設</button>
+                    )}
+                    <button onClick={() => onRemove(a.id)} className="text-slate-600 hover:text-red-400">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -444,17 +549,49 @@ const AlertPanel = ({ ticker, alerts, triggeredAlerts, onAdd, onRemove }) => {
   );
 };
 
-const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, onSharesChange }) => {
-  // Compute portfolio data
+const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, onSharesChange, onAvgCostChange }) => {
+  const [livePrices, setLivePrices] = useState({});
+  const [liveLoading, setLiveLoading] = useState(false);
+
+  // 每 30 秒自動抓取所有自選股即時價格
+  useEffect(() => {
+    if (!watchlist.length) return;
+    const fetchAll = async () => {
+      setLiveLoading(true);
+      const results = {};
+      for (const item of watchlist) {
+        try {
+          const live = await fetchTWSELive(item.ticker);
+          if (live?.last) results[item.ticker] = live;
+        } catch { /* 盤後或查無資料時靜默忽略 */ }
+      }
+      setLivePrices(results);
+      setLiveLoading(false);
+    };
+    fetchAll();
+    const id = setInterval(fetchAll, 30000);
+    return () => clearInterval(id);
+  }, [watchlist.map((w) => w.ticker).join(',')]);
+
+  // 合併 live 價格與歷史快取
   const portfolio = watchlist.map((item) => {
+    const live = livePrices[item.ticker];
     const hist = getHistory(item.ticker);
     const latest = hist.length > 0 ? hist[hist.length - 1].metrics : null;
-    const price = latest?.price ?? 0;
-    return { ...item, latest, price, value: item.shares * price };
+    const price = live?.last ?? latest?.price ?? 0;
+    const prevClose = live?.prevClose ?? null;
+    const changePercent = prevClose && price ? ((price - prevClose) / prevClose) * 100 : null;
+    const value = item.shares * price;
+    const cost = item.avgCost > 0 ? item.avgCost * item.shares : 0;
+    const pnl = cost > 0 ? value - cost : null;
+    const pnlPct = cost > 0 && item.avgCost > 0 ? ((price - item.avgCost) / item.avgCost) * 100 : null;
+    return { ...item, latest, price, prevClose, changePercent, value, pnl, pnlPct, isLive: !!live };
   });
 
   const holdingItems = portfolio.filter((p) => p.shares > 0 && p.price > 0);
   const totalAsset = holdingItems.reduce((sum, p) => sum + p.value, 0);
+  const totalCost = holdingItems.reduce((sum, p) => sum + (p.avgCost > 0 ? p.avgCost * p.shares : 0), 0);
+  const totalPnl = totalCost > 0 ? totalAsset - totalCost : null;
 
   const pieOptions = {
     chart: { background: 'transparent' },
@@ -473,7 +610,15 @@ const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <span className="text-slate-400 text-sm font-medium">自選清單 ({watchlist.length})</span>
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 text-sm font-medium">自選清單 ({watchlist.length})</span>
+          {liveLoading && <span className="text-[10px] text-slate-600">更新中…</span>}
+          {!liveLoading && Object.keys(livePrices).length > 0 && (
+            <span className="flex items-center gap-1 text-[10px] text-green-600">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full" /> 即時
+            </span>
+          )}
+        </div>
         {watchlist.length > 0 && (
           <button onClick={onBatchQuery} disabled={loading} className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors">
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> 全部查詢
@@ -481,13 +626,19 @@ const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, 
         )}
       </div>
 
-      {/* Total Asset */}
+      {/* Total Asset + P&L */}
       {totalAsset > 0 && (
         <div className="bg-blue-900/20 border border-blue-700/50 rounded-2xl p-4 text-center">
           <div className="text-xs text-blue-400 uppercase font-medium mb-1">投資組合總市值</div>
           <div className="text-2xl font-bold font-mono text-blue-300">
             ${totalAsset.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
+          {totalPnl !== null && (
+            <div className={`text-xs font-medium mt-1 ${totalPnl >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+              未實現損益 {totalPnl >= 0 ? '▲' : '▼'} ${Math.abs(totalPnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {totalCost > 0 && ` (${((totalPnl / totalCost) * 100).toFixed(2)}%)`}
+            </div>
+          )}
         </div>
       )}
 
@@ -495,7 +646,7 @@ const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, 
       {holdingItems.length >= 2 && (
         <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
           <div className="text-xs text-slate-500 uppercase mb-2 font-medium">持股配比</div>
-          <Chart options={pieOptions} series={pieSeries} type="pie" height={220} />
+          <Chart options={pieOptions} series={pieSeries} type="pie" height={200} />
         </div>
       )}
 
@@ -505,52 +656,125 @@ const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, 
           <p className="text-sm">尚無自選股票<br />在總覽頁點擊星號加入</p>
         </div>
       ) : (
-        portfolio.map((p) => (
-          <div key={p.ticker} className="bg-slate-800/50 border border-slate-700 rounded-2xl p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-slate-200">{getTickerLabel(p.ticker)}</span>
-                  {p.latest && <span className="text-xs text-slate-500">${p.price.toFixed(2)}</span>}
-                </div>
-                {p.latest && (
-                  <div className="flex gap-3 mt-1 text-[10px] text-slate-500">
-                    <span>RSI {p.latest.rsi}</span>
-                    <span className={p.latest.rsi > 70 ? 'text-red-400' : p.latest.rsi < 30 ? 'text-green-400' : ''}>
-                      {p.latest.rsi > 70 ? '超買' : p.latest.rsi < 30 ? '超賣' : '中性'}
-                    </span>
-                    {p.latest.trend && <span>{p.latest.trend}</span>}
+        portfolio.map((p) => {
+          const isUp = p.changePercent !== null && p.changePercent >= 0;
+          return (
+            <div key={p.ticker} className="bg-slate-800/50 border border-slate-700 rounded-2xl p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-slate-200">{getTickerLabel(p.ticker)}</span>
+                    {p.price > 0 && (
+                      <span className={`text-xs font-mono font-bold ${p.changePercent !== null ? (isUp ? 'text-red-400' : 'text-green-400') : 'text-slate-400'}`}>
+                        ${p.price.toFixed(2)}
+                        {p.changePercent !== null && (
+                          <span className="ml-1 text-[10px]">{isUp ? '▲' : '▼'}{Math.abs(p.changePercent).toFixed(2)}%</span>
+                        )}
+                      </span>
+                    )}
                   </div>
-                )}
+                  {p.latest && !p.isLive && (
+                    <div className="flex gap-3 mt-0.5 text-[10px] text-slate-600">
+                      <span>RSI {p.latest.rsi}</span>
+                      <span>{p.latest.trend}</span>
+                      <span className="italic">歷史快取</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => onSetInput(p.ticker)} className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1">查詢</button>
+                  <button onClick={() => onToggle(p.ticker)} className="text-slate-600 hover:text-red-400 p-1">
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => onSetInput(p.ticker)} className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1">查詢</button>
-                <button onClick={() => onToggle(p.ticker)} className="text-slate-600 hover:text-red-400 p-1">
-                  <X size={14} />
-                </button>
+
+              {/* Shares + avgCost + P&L */}
+              <div className="mt-2 pt-2 border-t border-slate-700/50 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 w-10">持股</span>
+                  <input
+                    type="number" min="0" value={p.shares || ''} placeholder="0"
+                    onChange={(e) => onSharesChange(p.ticker, e.target.value)}
+                    className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500 w-20 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-600">股</span>
+                  {p.shares > 0 && p.price > 0 && (
+                    <span className="text-[10px] text-slate-400 ml-auto font-mono">
+                      市值 ${p.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 w-10">成本</span>
+                  <input
+                    type="number" min="0" step="0.01" value={p.avgCost || ''} placeholder="均價"
+                    onChange={(e) => onAvgCostChange(p.ticker, e.target.value)}
+                    className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-amber-500 w-20 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-600">元</span>
+                  {p.pnlPct !== null && (
+                    <span className={`text-[10px] ml-auto font-mono font-bold ${p.pnlPct >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {p.pnlPct >= 0 ? '▲' : '▼'}{Math.abs(p.pnlPct).toFixed(2)}%
+                      {p.pnl !== null && ` (${p.pnl >= 0 ? '+' : ''}${Math.round(p.pnl).toLocaleString()})`}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            {/* Shares input row */}
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
-              <span className="text-[10px] text-slate-500">持股</span>
-              <input
-                type="number"
-                min="0"
-                value={p.shares || ''}
-                placeholder="0"
-                onChange={(e) => onSharesChange(p.ticker, e.target.value)}
-                className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500 w-20 font-mono"
-              />
-              <span className="text-[10px] text-slate-600">股</span>
-              {p.shares > 0 && p.price > 0 && (
-                <span className="text-[10px] text-slate-400 ml-auto font-mono">
-                  = ${p.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </span>
-              )}
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
+    </div>
+  );
+};
+
+const LivePriceCard = ({ data, error }) => {
+  if (error) return (
+    <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-3 text-center text-[11px] text-slate-500">
+      {error}
+    </div>
+  );
+  if (!data) return null;
+  const change = data.last && data.prevClose
+    ? ((data.last - data.prevClose) / data.prevClose) * 100
+    : null;
+  const isUp = change !== null && change >= 0;
+  return (
+    <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 uppercase font-medium">
+          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+          即時行情
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-slate-500">{data.date ? `${data.date.slice(0,4)}/${data.date.slice(4,6)}/${data.date.slice(6,8)}` : ''}</div>
+          <div className="text-[10px] text-slate-600">{data.time}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="text-[10px] text-slate-500 mb-0.5">開盤價</div>
+          <div className="text-lg font-bold font-mono text-slate-100">${data.open?.toFixed(2) ?? '-'}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 mb-0.5">最新成交</div>
+          <div className={`text-lg font-bold font-mono ${change !== null ? (isUp ? 'text-red-400' : 'text-green-400') : 'text-slate-100'}`}>
+            ${data.last?.toFixed(2) ?? '-'}
+            {change !== null && (
+              <span className="text-xs ml-1">{isUp ? '▲' : '▼'}{Math.abs(change).toFixed(2)}%</span>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 mb-0.5">最高</div>
+          <div className="text-sm font-mono text-red-400">${data.high?.toFixed(2) ?? '-'}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 mb-0.5">最低</div>
+          <div className="text-sm font-mono text-green-400">${data.low?.toFixed(2) ?? '-'}</div>
+        </div>
+      </div>
     </div>
   );
 };

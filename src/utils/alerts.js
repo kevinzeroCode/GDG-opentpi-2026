@@ -1,8 +1,6 @@
 const STORAGE_KEY = 'quant_alerts';
 
-// Alert shape: { id, ticker, indicator, operator, value, enabled }
-// indicator: 'rsi' | 'k' | 'd' | 'macd' | 'price'
-// operator: '>' | '<'
+// Alert shape: { id, ticker, indicator, operator, value, enabled, firedAt }
 
 export const getAlerts = () => {
   try {
@@ -12,30 +10,52 @@ export const getAlerts = () => {
   }
 };
 
-export const saveAlert = (alert) => {
-  const alerts = getAlerts();
-  alerts.push({ ...alert, id: Date.now(), enabled: true });
+const _save = (alerts) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
 };
 
+export const saveAlert = (alert) => {
+  const alerts = getAlerts();
+  alerts.push({ ...alert, id: Date.now(), enabled: true, firedAt: null });
+  _save(alerts);
+};
+
 export const removeAlert = (id) => {
-  const alerts = getAlerts().filter((a) => a.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
+  _save(getAlerts().filter((a) => a.id !== id));
+};
+
+// 標記已觸發（之後不再重複發送）
+export const markAlertFired = (id) => {
+  const alerts = getAlerts().map((a) =>
+    a.id === id ? { ...a, firedAt: Date.now() } : a
+  );
+  _save(alerts);
+};
+
+// 重設警報（允許再次觸發）
+export const resetAlert = (id) => {
+  const alerts = getAlerts().map((a) =>
+    a.id === id ? { ...a, firedAt: null } : a
+  );
+  _save(alerts);
 };
 
 export const checkAlerts = (ticker, metrics) => {
   if (!ticker || !metrics) return [];
-  const alerts = getAlerts().filter((a) => a.enabled && a.ticker === ticker);
+  // 只檢查尚未觸發過的警報
+  const alerts = getAlerts().filter((a) => a.enabled && a.ticker === ticker && !a.firedAt);
   const triggered = [];
 
   for (const alert of alerts) {
     const val = metrics[alert.indicator];
     if (val == null) continue;
 
-    const hit = alert.operator === '>'
-      ? val > alert.value
-      : val < alert.value;
-
+    const hit =
+      alert.operator === '>'  ? val > alert.value  :
+      alert.operator === '<'  ? val < alert.value  :
+      alert.operator === '>=' ? val >= alert.value :
+      alert.operator === '<=' ? val <= alert.value :
+      val === alert.value;
     if (hit) {
       triggered.push({
         ...alert,
