@@ -7,13 +7,13 @@ const MACDChart = ({ macd, signal, histogram }) => {
   const isPositive = histVal >= 0;
 
   const getCrossSignal = () => {
-    if (macdVal > signalVal) return { text: '黃金交叉（多頭）', color: 'text-green-400' };
-    return { text: '死亡交叉（空頭）', color: 'text-red-400' };
+    if (macdVal > signalVal) return { text: '黃金交叉（多頭）', color: 'text-red-400' };
+    return { text: '死亡交叉（空頭）', color: 'text-green-400' };
   };
 
   const getMomentum = () => {
-    if (histVal > 0) return { text: '多頭動能', color: 'text-green-400', bg: 'bg-green-500' };
-    return { text: '空頭動能', color: 'text-red-400', bg: 'bg-red-500' };
+    if (histVal > 0) return { text: '多頭動能', color: 'text-red-400', bg: 'bg-red-500' };
+    return { text: '空頭動能', color: 'text-green-400', bg: 'bg-green-500' };
   };
 
   const cross = getCrossSignal();
@@ -38,13 +38,13 @@ const MACDChart = ({ macd, signal, histogram }) => {
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-slate-900/50 rounded-xl p-3">
           <div className="text-[10px] text-slate-500 uppercase mb-1">MACD</div>
-          <div className={`text-lg font-mono font-bold ${macdVal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <div className={`text-lg font-mono font-bold ${macdVal >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {macdVal.toFixed(2)}
           </div>
         </div>
         <div className="bg-slate-900/50 rounded-xl p-3">
           <div className="text-[10px] text-slate-500 uppercase mb-1">Signal</div>
-          <div className={`text-lg font-mono font-bold ${signalVal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <div className={`text-lg font-mono font-bold ${signalVal >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {signalVal.toFixed(2)}
           </div>
         </div>
@@ -54,7 +54,7 @@ const MACDChart = ({ macd, signal, histogram }) => {
       <div className="mb-3">
         <div className="flex justify-between items-center mb-1">
           <span className="text-xs text-slate-400">Histogram</span>
-          <span className={`text-sm font-mono font-bold ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+          <span className={`text-sm font-mono font-bold ${isPositive ? 'text-red-400' : 'text-green-400'}`}>
             {histVal.toFixed(2)}
           </span>
         </div>

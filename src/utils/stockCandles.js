@@ -52,7 +52,8 @@ export const fetchStockCandles = async (ticker) => {
   // Determine incremental start date
   let startDate;
   if (!cached?.data?.length) {
-    startDate = '1990-01-01'; // full history on first load
+    // 首次載入只抓近 5 年，避免大量資料造成卡頓
+    startDate = formatDate(new Date(new Date().getFullYear() - 5, 0, 1));
   } else {
     // Fetch from day after the last data point we have
     const lastTs = cached.data[cached.data.length - 1]?.x;

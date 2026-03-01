@@ -34,12 +34,16 @@ const useDifyAPI = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || `Error: ${response.status}`);
 
-      // 提取原始文字
-      const rawText = data.data?.outputs?.ticker;
+      const rawText = data.data?.outputs?.ticker || null;
+      const commentary = data.data?.outputs?.commentary || null;
+      const tickerCode = data.data?.outputs?.ticker_code || null; // Dify 提取到的實際代號
 
-      // Extract ticker from query (e.g. "2330" from "2330" or "分析 2330")
-      const tickerMatch = userSearch.match(/\d{4,}/);
-      const ticker = tickerMatch ? tickerMatch[0] : userSearch.trim();
+      // 一般問答（無股票代號）
+      if (!rawText && commentary) {
+        setAnalysisResult({ rawText: null, metrics: null, commentary });
+        setLastTicker(null);
+        return;
+      }
 
       if (!rawText) {
         setError('查詢未取得資料，請確認股票代碼是否正確，或稍後再試。');
@@ -63,7 +67,15 @@ const useDifyAPI = () => {
         return;
       }
 
-      setAnalysisResult({ rawText, metrics: parsedData });
+      // 優先使用 Dify 提取的代號（最準確），其次從輸入字串取數字
+      const tickerMatch = userSearch.match(/\d{4,}/);
+      const ticker = (tickerCode && /^\d{4,6}$/.test(tickerCode.trim()))
+        ? tickerCode.trim()
+        : tickerMatch
+          ? tickerMatch[0]
+          : userSearch.trim();
+
+      setAnalysisResult({ rawText, metrics: parsedData, commentary });
       setLastTicker(ticker);
 
       // Auto-save to history
