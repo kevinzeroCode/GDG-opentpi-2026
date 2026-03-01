@@ -5,12 +5,7 @@ app:
   mode: workflow
   name: 儀錶板測試
   use_icon_as_answer_icon: false
-dependencies:
-- current_identifier: null
-  type: marketplace
-  value:
-    marketplace_plugin_unique_identifier: langgenius/gemini:0.7.7@e12c712679171e20bacf59cd12e88efe8c2a508450cd23ce8424a91dc29353db
-    version: null
+dependencies: []
 kind: app
 version: 0.6.0
 workflow:
@@ -82,12 +77,36 @@ workflow:
         isInIteration: false
         isInLoop: false
         sourceType: parameter-extractor
-        targetType: http-request
-      id: 1770907528913-source-1770912568990-target
+        targetType: if-else
+      id: 1770907528913-source-1771800000001-target
       selected: false
       source: '1770907528913'
       sourceHandle: source
+      target: '1771800000001'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: http-request
+      id: 1771800000001-true-1770912568990-target
+      selected: false
+      source: '1771800000001'
+      sourceHandle: 'true'
       target: '1770912568990'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1771800000001-false-1771800000002-target
+      selected: false
+      source: '1771800000001'
+      sourceHandle: 'false'
+      target: '1771800000002'
       targetHandle: target
       type: custom
       zIndex: 0
@@ -116,6 +135,18 @@ workflow:
       targetHandle: target
       type: custom
       zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1771800000002-source-1771800000003-target
+      selected: false
+      source: '1771800000002'
+      sourceHandle: source
+      target: '1771800000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
     nodes:
     - data:
         selected: false
@@ -134,25 +165,25 @@ workflow:
       id: '1770907397757'
       position:
         x: 80
-        y: 282
+        y: 350
       positionAbsolute:
         x: 80
-        y: 282
+        y: 350
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 242
     - data:
-        instruction: 請從用戶的話中提取股票代號。如果是中文名稱（如台積電），請轉換為代號（2330）。
+        instruction: 請從用戶的話中提取股票代號。如果是中文名稱（如台積電），請轉換為代號（2330）。若輸入是一般問題而非股票查詢，請回傳空字串。
         model:
           completion_params:
-            temperature: 0.7
+            temperature: 0.3
           mode: chat
-          name: gemini-2.5-flash
-          provider: langgenius/gemini/google
+          name: gpt-5.2
+          provider: langgenius/openai/openai
         parameters:
-        - description: ticker
+        - description: 股票代號，若無則為空字串
           name: ticker
           required: false
           type: string
@@ -169,34 +200,35 @@ workflow:
       id: '1770907528913'
       position:
         x: 382
-        y: 282
+        y: 350
       positionAbsolute:
         x: 382
-        y: 282
+        y: 350
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 241
     - data:
-        outputs:
-        - value_selector:
-          - '1771658568086'
-          - result
-          value_type: string
-          variable: ticker
-        selected: true
-        title: 輸出
-        type: end
-      height: 87
-      id: '1770909970504'
+        conditions:
+        - comparison_operator: not-empty
+          id: cond-stock-1
+          variable_selector:
+          - '1770907528913'
+          - ticker
+        logical_operator: and
+        selected: false
+        title: 是否為股票查詢
+        type: if-else
+      height: 126
+      id: '1771800000001'
       position:
-        x: 1720.3862652939106
-        y: 282
+        x: 680
+        y: 350
       positionAbsolute:
-        x: 1720.3862652939106
-        y: 282
-      selected: true
+        x: 680
+        y: 350
+      selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
@@ -208,8 +240,8 @@ workflow:
         body:
           data: []
           type: none
-        headers: User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
-          (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
+        headers: 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+          (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         method: get
         params: ''
         retry_config:
@@ -224,16 +256,16 @@ workflow:
           max_write_timeout: 0
         title: HTTP 請求
         type: http-request
-        url: https://query1.finance.yahoo.com/v8/finance/chart/{{#1770907528913.ticker#}}.TW?interval=1d&range=3mo
+        url: 'https://query1.finance.yahoo.com/v8/finance/chart/{{#1770907528913.ticker#}}.TW?interval=1d&range=3mo'
         variables: []
       height: 171
       id: '1770912568990'
       position:
-        x: 746
-        y: 282
+        x: 980
+        y: 180
       positionAbsolute:
-        x: 746
-        y: 282
+        x: 980
+        y: 180
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -292,18 +324,108 @@ workflow:
       height: 51
       id: '1771658568086'
       position:
-        x: 1147
-        y: 282
+        x: 1280
+        y: 180
       positionAbsolute:
-        x: 1147
-        y: 282
+        x: 1280
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector:
+          - '1771658568086'
+          - result
+          value_type: string
+          variable: ticker
+        - value_selector:
+          - '1770907528913'
+          - ticker
+          value_type: string
+          variable: ticker_code
+        selected: false
+        title: 輸出（個股）
+        type: end
+      height: 87
+      id: '1770909970504'
+      position:
+        x: 1580
+        y: 180
+      positionAbsolute:
+        x: 1580
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.75
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: sys-general
+          role: system
+          text: "你是一位台股投資助理，能回答各種投資相關問題，語氣親切易懂，適合一般投資人。\n\n你可以協助的範圍：\n📚 解釋技術指標（RSI、MACD、KD、均線、布林通道等）\n\
+            💡 說明投資基本概念與策略（長期投資、波段操作、停損設定等）\n🏢 介紹台股市場運作（交易時間、漲跌停、融資融券等）\n📰 回答一般財經與總經問題\n\
+            🔍 比較不同投資工具的優缺點\n\n若用戶想查詢個股技術分析，請引導他們輸入股票代號（4到6位數字），例如：\n- 2330（台積電）\n\
+            - 0050（元大台灣50）\n- 2317（鴻海）\n\n回答時若涉及投資操作建議，最後加上適當免責聲明。"
+        - id: user-general
+          role: user
+          text: "{{#1770907397757.query#}}"
+        selected: false
+        title: 一般問答 AI
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 99
+      id: '1771800000002'
+      position:
+        x: 980
+        y: 520
+      positionAbsolute:
+        x: 980
+        y: 520
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector:
+          - '1771800000002'
+          - text
+          value_type: string
+          variable: commentary
+        selected: false
+        title: 輸出（一般）
+        type: end
+      height: 87
+      id: '1771800000003'
+      position:
+        x: 1280
+        y: 520
+      positionAbsolute:
+        x: 1280
+        y: 520
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 241
     viewport:
-      x: -744.214426201064
-      y: 227.9320648055226
-      zoom: 0.8312378961427878
+      x: -200
+      y: 100
+      zoom: 0.7
   rag_pipeline_variables: []
