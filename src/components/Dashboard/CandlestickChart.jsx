@@ -85,10 +85,12 @@ const CandlestickChart = ({ ticker, liveData }) => {
       if (!last || last.x < todayTs) {
         filtered = [
           ...filtered,
-          { x: todayTs, o: live.open, h: live.high, l: live.low, c: live.last, v: 0 },
+          { x: todayTs, o: live.open, h: live.high ?? live.open, l: live.low ?? live.open, c: live.last ?? live.open, v: 0 },
         ];
       }
     }
+    // 最多顯示 600 根，避免大量 SVG 元素凍結瀏覽器
+    if (filtered.length > 600) filtered = filtered.slice(-600);
     return filtered;
   }, [allCandles, period]);
 
@@ -270,7 +272,7 @@ const CandlestickChart = ({ ticker, liveData }) => {
         <div className="flex items-center gap-2">
           {last && (
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold font-mono text-slate-200">${last.c.toFixed(2)}</span>
+              <span className="text-sm font-bold font-mono text-slate-200">${last.c?.toFixed(2) ?? '-'}</span>
               <span className={`text-xs font-medium ${isUp ? 'text-red-400' : 'text-green-400'}`}>
                 {isUp ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
               </span>
