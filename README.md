@@ -1,165 +1,267 @@
 # QuantDashboard AI — 智能台股量化分析助手
 
-基於 **React + Vite** 前端、**Dify.ai** AI 工作流、**DigiRunner** API Gateway 的台股量化分析儀表板。透過對話式介面輸入股票代號或中文名稱，即時取得技術指標分析，並以財金專家觀點產生白話解讀。
+> 基於 **React + Vite** 前端、**FastAPI** 數據中台、**Dify.ai** AI 對話引擎、**DigiRunner** JWT API Gateway 的全端台股量化分析平台。
+> 支援使用者系統、多輪對話、即時技術指標分析與投資組合管理。
+
+---
+
+## 系統架構
+
+```mermaid
+graph TB
+    subgraph Client["🖥️ 瀏覽器 (localhost:5173)"]
+        FE["React + Vite\nQuantDashboard AI"]
+    end
+
+    subgraph Gateway["🛡️ API Gateway Layer"]
+        DGR["DigiRunner\n(port 31080)\nJWT 認證 + 審計日誌"]
+        NGX["nginx Gateway\n(port 9000)\nRate Limit 保護"]
+    end
+
+    subgraph Platform["⚙️ 數據中台 (port 8000)"]
+        API["FastAPI\ndata-platform"]
+        PG[("PostgreSQL\n共用 DB")]
+        RD[("Redis\n快取")]
+        ETL["APScheduler\nETL 排程"]
+    end
+
+    subgraph AI["🤖 AI 引擎 (port 80)"]
+        WF["Workflow App\n財金數據回測助手"]
+        CHAT["Chat App\n股票分析助手"]
+    end
+
+    subgraph External["🌐 外部資料源"]
+        TWSE["TWSE\n即時行情"]
+        FM["FinMind\n歷史 K 線"]
+    end
+
+    FE -- "① 登入/註冊" --> API
+    API -- "② App JWT + DigiRunner Token" --> FE
+
+    FE -- "③ AI 分析 (Bearer DGR Token)" --> DGR
+    DGR -- "④ JWT 驗證 → 轉發" --> API
+    FE -. "匿名降級 (無 token)" .-> NGX
+    NGX -. "Rate Limit 10 req/min" .-> API
+
+    API --> WF
+    API --> CHAT
+    API --- PG
+    API --- RD
+    ETL -- "每日 18:05" --> FM
+    API -- "即時行情" --> TWSE
+
+    style Client fill:#1e3a5f,color:#fff
+    style Gateway fill:#1a3a2a,color:#fff
+    style Platform fill:#3a1a1a,color:#fff
+    style AI fill:#3a2a1a,color:#fff
+    style External fill:#2a2a3a,color:#fff
+```
+
+### 元件說明
+
+| 元件 | 技術 | Port | 說明 |
+|------|------|------|------|
+| 前端 | React 18 + Vite + Tailwind CSS | 5173 | 主介面，Docker 容器化 |
+| DigiRunner | tpisoftware/digirunner v4.7.3 | 31080 | JWT gateway，API 路由 + 審計日誌 |
+| nginx | nginx:alpine | 9000 | 匿名降級路徑，rate limit 10 req/min |
+| data-platform | FastAPI + asyncpg | 8000 | 使用者認證、AI 轉發、ETL、watchlist |
+| Dify | langgenius/dify v1.13 | 80 | AI Workflow + Chat 多輪對話 |
+| PostgreSQL | postgres:15 | 5432 | 共用資料庫（Dify + data-platform） |
+| Redis | redis:6 | 6379 | 即時行情快取（30s TTL） |
 
 ---
 
 ## 核心功能
 
-### 對話式 AI 分析
-- 類 ChatGPT 介面，支援輸入台股代號（`2330`）或中文名稱（`台積電`、`中華電信`）
-- 自動模糊比對中文名稱 → 代號（如「聯發科技」→ `2454`）
-- **財金專家解說**：RSI、KD、MACD 等指標自動轉化為淺顯易懂的技術面分析報告
-- 一次輸入多檔代號（如 `2330 2317`）批次分析
-- 一般財經問答（非個股查詢時由 GPT 回答通用投資問題）
+### 🔐 使用者系統
+- 帳號註冊 / 登入（bcrypt + HS256 JWT）
+- 登入後 server-side 自動取得 DigiRunner gateway token
+- 每位使用者獨立 watchlist（PostgreSQL per-user 隔離）
+- 未登入用戶可匿名使用（走 nginx gateway，有 rate limit）
 
-### 即時儀表板（4 個分頁）
+### 🤖 對話式 AI 分析（多輪對話）
+- 類 ChatGPT 介面，支援台股代號（`2330`）或中文名稱（`台積電`）
+- **Dify Chat 模式**：`conversation_id` 跨輪保留，支援追問（「那 RSI 超買要怎麼操作？」）
+- 自動帶入前 2 輪查詢上下文
+- 一次輸入多檔代號（`2330 2317`）批次分析
+- 一般財經問答（非個股查詢由 AI 回答通用問題）
+
+### 📊 即時儀表板（4 個分頁）
 
 | 分頁 | 內容 |
 |------|------|
-| **總覽** | 即時股價、MA5、趨勢判斷、RSI 儀表板、即時行情卡（每 5 秒更新）、K 線圖 |
+| **總覽** | 即時股價、MA5、趨勢判斷、RSI 儀表板、即時行情卡（5 秒更新）、K 線圖 |
 | **技術指標** | KD 圖表、MACD 圖表、綜合訊號判定（多/空/中性）、智慧警報設定 |
-| **歷史趨勢** | RSI / KD / MACD 歷史折線圖、日期篩選、年化報酬率、多股比較（最多 4 檔） |
-| **自選** | 自選清單 + 即時價格自動更新（30 秒）、持股數與平均成本輸入、未實現損益計算、投資組合圓餅圖 |
+| **歷史趨勢** | RSI / KD / MACD 歷史折線圖、日期篩選、年化報酬率、多股比較（最多 4 檔）|
+| **自選** | 個人 watchlist + 即時報價（30 秒）、持股成本輸入、未實現損益、組合圓餅圖 |
 
-### K 線圖（CandlestickChart）
-- 台股 K 棒（漲紅跌綠，台灣慣例）
-- 底部成交量 bar（佔圖表下方 20%）
-- MA5 / MA20 / MA60 均線可獨立切換顯示
-- 時間軸：1D / 1W / 1M / 3M / 6M / 1Y / 3Y / 5Y
-- 可縮放、拖曳平移，切換時間段不重置縮放狀態
-- Tooltip 同時顯示 OHLC + 各均線值 + 成交量
-- localStorage 快取，增量更新（只抓新增日期），避免重複下載
+### 📈 K 線圖
+- 台股 K 棒（漲紅跌綠）+ 底部成交量
+- MA5 / MA20 / MA60 均線切換
+- 時間段：1D / 1W / 1M / 3M / 6M / 1Y / 3Y / 5Y
+- localStorage 快取 + 增量更新
 
-### 自選清單 & 投資組合
-- 總覽頁點擊星號加入自選
-- 盤中每 30 秒自動抓取所有自選股即時價格（含漲跌幅）
-- 輸入持股數量 + 平均成本，自動計算未實現損益（金額 + %）
-- 投資組合總市值與總損益彙總
-- 持股配比圓餅圖
-- 一鍵批次查詢所有自選股
-
-### 智慧警報
-- 自訂指標條件（`RSI > 70`、`價格 < 500`、`MACD > 0` 等）
-- 瀏覽器推播通知
-- EmailJS 警報信箱通知
-- 背景每 5 秒自動輪詢 price 類型警報（不需手動查詢）
-
-### 其他
-- 匯出儀表板為 PNG 截圖
-- 載入中動畫（氣泡 + 骨架屏）
-- 響應式設計（桌面 / 手機）
-
----
-
-## 技術架構
-
-```
-使用者
-  ↓
-React + Vite (port 5173)
-  ↓
-DigiRunner API Gateway (port 31080)
-  ├── /dify/v1/workflows/run  →  Dify AI (port 80)
-  ├── /finmind/api/v4/data    →  FinMind API (歷史 K 線)
-  └── /twse/stock/api/...     →  TWSE 即時行情
-```
-
-### 技術棧
-
-| 分類 | 技術 |
-|------|------|
-| Frontend | React 18, Vite, Tailwind CSS |
-| Charts | ApexCharts (react-apexcharts) |
-| Icons | Lucide React |
-| AI Engine | Dify.ai Workflow + GPT-5.2 |
-| 歷史數據 | FinMind API (台股日 K、三大法人等) |
-| 即時行情 | TWSE mis.twse.com.tw |
-| API Gateway | DigiRunner (Docker) |
-| Email 通知 | EmailJS |
-| 截圖匯出 | html2canvas |
+### 🔔 智慧警報
+- 自訂條件（`RSI > 70`、`價格 < 500`）
+- 瀏覽器推播 + EmailJS 信箱通知
 
 ---
 
 ## 快速啟動
 
 ### 前置需求
-- Node.js 18+
 - Docker Desktop
+- Node.js 18+（本地開發用）
 
 ### 1. 複製專案
+
 ```bash
 git clone https://github.com/kevinzeroCode/GDG-opentpi-2026.git
 cd GDG-opentpi-2026
 ```
 
-### 2. 環境設定
-複製 `.env.example` 為 `.env` 並填入實際值：
+### 2. 啟動所有服務
+
 ```bash
-cp .env.example .env
+# Dify（AI 引擎）
+cd ../dify/docker && docker compose up -d
+
+# 數據中台 + nginx gateway
+cd ../../data-platform && docker compose up -d
+
+# 前端 + DigiRunner
+cd "../QuantDashboard AI" && docker compose up -d
 ```
 
-| 變數 | 說明 |
-|------|------|
-| `VITE_DIFY_API_URL` | Dify API 位址（預設透過 DigiRunner: `http://localhost:31080/dify/v1`） |
-| `VITE_DIFY_API_KEY` | Dify 後台 → 應用程式 → API 金鑰 |
-| `VITE_EMAILJS_SERVICE_ID` | EmailJS Service ID |
-| `VITE_EMAILJS_TEMPLATE_ID` | EmailJS Template ID |
-| `VITE_EMAILJS_PUBLIC_KEY` | EmailJS Public Key |
-
-### 3. 啟動 DigiRunner（API Gateway）
+或使用一鍵啟動腳本（Windows）：
 ```bash
-docker-compose up -d digirunner
+start.bat
 ```
-首次啟動後，進入 DigiRunner 管理介面（`http://localhost:31080`）匯入 `digirunner/apis-export.json`。
-> 詳細說明請參考 [digirunner/README.md](digirunner/README.md)
 
-### 4. 啟動 Dify AI 服務
-確保 Dify 已於 Docker 啟動（`http://localhost`），並匯入 `dify_config/儀錶板測試.yml` 工作流後**發布**。
+### 3. 初始化 Dify
 
-### 5. 啟動前端
-```bash
-npm install
-npm run dev
+1. 開啟 `http://localhost:80`，完成管理員帳號設定
+2. 匯入 `dify_config/` 下的兩個 DSL 檔案：
+   - `財金數據回測助手.yml`（Workflow App）
+   - `stock_chat_app.yml`（Chat App）
+3. 各 App 點「**發布**」後，複製 API Key 填入 `data-platform/.env`
+
+### 4. 環境設定
+
+**`QuantDashboard AI/.env`**
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_GATEWAY_URL=http://localhost:9000/gateway
+VITE_DIGIRUNNER_URL=http://localhost:31080
+VITE_EMAILJS_SERVICE_ID=your_service_id
+VITE_EMAILJS_TEMPLATE_ID=your_template_id
+VITE_EMAILJS_PUBLIC_KEY=your_public_key
 ```
-開啟瀏覽器造訪 [http://localhost:5173](http://localhost:5173)
+
+**`data-platform/.env`**
+```env
+DB_HOST=docker-db_postgres-1
+DB_NAME=dify
+DB_USER=postgres
+DB_PASSWORD=difyai123456
+REDIS_URL=redis://redis:6379/1
+DIFY_API_KEY=app-xxxxxxxx          # Workflow App key
+DIFY_CHAT_API_KEY=app-xxxxxxxx     # Chat App key
+CORS_ORIGINS=http://localhost:5173
+```
+
+### 5. 開啟瀏覽器
+
+```
+http://localhost:5173
+```
 
 ---
 
 ## 專案結構
 
 ```
-├── src/
-│   ├── components/Dashboard/
-│   │   ├── CandlestickChart.jsx  # K 線圖（成交量 + MA 均線）
-│   │   ├── GaugeChart.jsx        # RSI 儀表板
-│   │   ├── KDChart.jsx           # KD 指標圖
-│   │   ├── MACDChart.jsx         # MACD 圖表
-│   │   ├── PriceChart.jsx        # 價格走勢圖
-│   │   └── HistoryChart.jsx      # 歷史趨勢（含比較模式）
-│   ├── hooks/
-│   │   ├── useDifyAPI.js         # Dify API Hook
-│   │   └── useTWSELive.js        # TWSE 即時行情 Hook（5 秒輪詢）
-│   ├── utils/
-│   │   ├── stockCandles.js       # FinMind K 線資料（含快取）
-│   │   ├── twseLive.js           # TWSE 即時行情
-│   │   ├── parser.js             # 指標文字解析器
-│   │   ├── commentary.js         # 財金解說產生器
-│   │   ├── history.js            # 歷史查詢紀錄
-│   │   ├── watchlist.js          # 自選清單（持股 + 成本 + 損益）
-│   │   ├── alerts.js             # 智慧警報邏輯
-│   │   ├── emailAlert.js         # EmailJS 通知
-│   │   └── tickerNames.js        # 中文名稱 ↔ 代號對照（含模糊比對）
-│   └── App.jsx                   # 主介面
-├── dify_config/
-│   └── 儀錶板測試.yml             # Dify 工作流（匯入用）
-├── digirunner/
-│   ├── apis-export.json          # DigiRunner 路由設定（匯入用）
-│   └── README.md
-├── docker-compose.yml
-├── .env.example
-└── vite.config.js
+GDG/
+├── QuantDashboard AI/              # React + Vite 前端
+│   ├── src/
+│   │   ├── hooks/
+│   │   │   ├── useAuth.js          # 統一認證 hook（App JWT + DGR token）
+│   │   │   ├── useDifyAPI.js       # AI 分析 hook（Chat 多輪 + 對話上下文）
+│   │   │   └── useTWSELive.js      # 即時行情 hook（5 秒輪詢）
+│   │   ├── utils/
+│   │   │   ├── watchlist.js        # 自選清單（含 platform 同步）
+│   │   │   ├── parser.js           # 指標文字解析器
+│   │   │   ├── alerts.js           # 智慧警報
+│   │   │   └── tickerNames.js      # 中文名稱 ↔ 代號對照
+│   │   └── App.jsx                 # 主介面（含登入/註冊 Modal）
+│   ├── docker-compose.yml          # 前端 + DigiRunner
+│   └── start.bat                   # 一鍵啟動腳本（Windows）
+│
+├── data-platform/                  # FastAPI 數據中台
+│   ├── app/
+│   │   ├── routers/
+│   │   │   ├── auth.py             # POST /api/auth/register|login|me
+│   │   │   ├── ai.py               # POST /api/ai/analyze（Chat 模式）
+│   │   │   ├── watchlist.py        # GET/POST/DELETE /api/watchlist（per-user）
+│   │   │   ├── stock.py            # GET /api/stock/live|history
+│   │   │   └── etl.py              # POST /api/etl/run（手動觸發）
+│   │   ├── services/
+│   │   │   ├── auth_service.py     # bcrypt + JWT + DigiRunner token 取得
+│   │   │   ├── dify_service.py     # Dify Chat / Workflow API 呼叫
+│   │   │   ├── db_service.py       # 使用者 CRUD、watchlist、ETL 持久化
+│   │   │   └── commentary_service.py  # 本地指標解說（Dify 降級備用）
+│   │   ├── config.py               # 環境變數設定（pydantic-settings）
+│   │   └── main.py                 # FastAPI app + startup hooks
+│   ├── nginx/nginx.conf            # Rate limit gateway 設定
+│   └── docker-compose.yml
+│
+├── dify/docker/                    # Dify 平台（langgenius/dify v1.13）
+└── dify_config/
+    ├── 財金數據回測助手.yml            # Dify Workflow DSL（匯入用）
+    └── stock_chat_app.yml           # Dify Chat DSL（匯入用）
 ```
+
+---
+
+## API 路徑總覽
+
+| 路徑 | 方法 | 說明 | 認證 |
+|------|------|------|------|
+| `/api/auth/register` | POST | 建立帳號，回傳 JWT + DGR token | 無 |
+| `/api/auth/login` | POST | 登入，回傳 JWT + DGR token | 無 |
+| `/api/auth/me` | GET | 取得當前使用者資訊 | App JWT |
+| `/api/ai/analyze` | POST | AI 股票分析（Chat 多輪對話）| 無（限速）|
+| `/api/watchlist` | GET/POST | 個人自選清單（登入後 per-user）| App JWT（可選）|
+| `/api/watchlist/{ticker}` | DELETE | 移除自選股 | App JWT（可選）|
+| `/api/stock/live/{ticker}` | GET | TWSE 即時行情（Redis 快取）| 無 |
+| `/api/stock/history/{ticker}` | GET | FinMind 歷史 K 線 | 無 |
+| `/api/etl/status` | GET | ETL 最後執行時間與狀態 | 無 |
+
+---
+
+## 路線圖
+
+### ✅ Phase 1 — AI Gateway 整合
+- [x] DigiRunner JWT 認證路徑（`/tsmpc/dgrc/ai_analyze`）
+- [x] nginx gateway 匿名降級路徑（rate limit 保護）
+- [x] Dify Chat 模式（`conversation_id` 多輪對話）
+- [x] 對話上下文自動附加（最近 2 輪）
+
+### ✅ Phase 2 — 後端強化
+- [x] 使用者系統（bcrypt + HS256 JWT）
+- [x] Server-side DigiRunner token 自動取得
+- [x] Per-user watchlist（PostgreSQL 隔離）
+- [x] ETL 持久化（`etl_runs` table）
+- [x] Redis 快取即時行情
+
+### 🔲 Phase 3 — 雲端部署（待實現）
+- [ ] 獨立 PostgreSQL（data-platform 脫離 Dify 共用 DB）
+- [ ] Docker image 推上 GHCR（GitHub Container Registry）
+- [ ] CI/CD Pipeline（GitHub Actions：lint → test → build → deploy）
+- [ ] 部署至雲端（GCP Cloud Run / Fly.io / AWS EC2）
+- [ ] HTTPS + 自訂網域（Let's Encrypt via Caddy / Cloudflare）
+- [ ] 生產環境 SECRET 管理（GitHub Secrets / GCP Secret Manager）
+- [ ] 監控 & 告警（Uptime Robot / Cloud Monitoring）
 
 ---
 
