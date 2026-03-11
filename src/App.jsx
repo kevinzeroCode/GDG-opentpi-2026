@@ -80,8 +80,7 @@ function App() {
 
   const handleLogout = () => {
     logout();
-    clearHistory();
-    setMessages(prev => [...prev, { role: 'bot', content: '已登出。後續請求將使用匿名模式。' }]);
+    window.location.reload();
   };
 
   const handleExport = async () => {
