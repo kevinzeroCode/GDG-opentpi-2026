@@ -48,7 +48,7 @@ function App() {
   const batchQuery = async () => {
     for (const item of watchlist) {
       setMessages(prev => [...prev, { role: 'user', content: item.ticker }]);
-      await fetchStockAnalysis(item.ticker, dgrToken);
+      await fetchStockAnalysis(item.ticker, appToken);
     }
   };
 
@@ -108,11 +108,11 @@ function App() {
     const tickers = [...new Set(userQuery.match(/\d{4,6}/g) || [])];
     if (tickers.length > 1) {
       for (const ticker of tickers) {
-        await fetchStockAnalysis(ticker, dgrToken);
+        await fetchStockAnalysis(ticker, appToken);
       }
     } else {
       // 嘗試將中文名稱解析為代號（如「台玻」→「1802」）
-      await fetchStockAnalysis(resolveToTicker(userQuery), dgrToken);
+      await fetchStockAnalysis(resolveToTicker(userQuery), appToken);
     }
   };
 

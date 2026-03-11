@@ -9,52 +9,46 @@
 
 ```mermaid
 graph TB
-    subgraph Client["🖥️ 瀏覽器 (localhost:5173)"]
-        FE["React + Vite\nQuantDashboard AI"]
+    subgraph Client["瀏覽器 — localhost:5173"]
+        FE["React + Vite / QuantDashboard AI"]
     end
 
-    subgraph Gateway["🛡️ API Gateway Layer"]
-        DGR["DigiRunner\n(port 31080)\nJWT 認證 + 審計日誌"]
-        NGX["nginx Gateway\n(port 9000)\nRate Limit 保護"]
+    subgraph GatewayLayer["API Gateway Layer"]
+        DGR["DigiRunner :31080<br/>JWT 簽發 + 審計日誌<br/>server-side 使用"]
+        NGX["nginx :9000<br/>Rate Limit 10 req/min<br/>匿名降級路徑"]
     end
 
-    subgraph Platform["⚙️ 數據中台 (port 8000)"]
-        API["FastAPI\ndata-platform"]
-        PG[("PostgreSQL\n共用 DB")]
-        RD[("Redis\n快取")]
-        ETL["APScheduler\nETL 排程"]
+    subgraph Platform["數據中台 — :8000"]
+        API["FastAPI / data-platform<br/>使用者認證、AI 轉發、ETL"]
+        PG[("PostgreSQL<br/>共用 DB")]
+        RD[("Redis<br/>行情快取")]
+        ETL["APScheduler<br/>每日 18:05 ETL"]
     end
 
-    subgraph AI["🤖 AI 引擎 (port 80)"]
-        WF["Workflow App\n財金數據回測助手"]
-        CHAT["Chat App\n股票分析助手"]
+    subgraph AIEngine["AI 引擎 — :80"]
+        WF["Dify Workflow App<br/>財金數據回測助手"]
+        CHAT["Dify Chat App<br/>股票分析助手<br/>多輪對話"]
     end
 
-    subgraph External["🌐 外部資料源"]
-        TWSE["TWSE\n即時行情"]
-        FM["FinMind\n歷史 K 線"]
+    subgraph External["外部資料源"]
+        TWSE["TWSE 即時行情"]
+        FM["FinMind 歷史 K 線"]
     end
 
-    FE -- "① 登入/註冊" --> API
-    API -- "② App JWT + DigiRunner Token" --> FE
+    FE -- "POST /api/auth/login" --> API
+    API -- "App JWT + DGR Token" --> FE
 
-    FE -- "③ AI 分析 (Bearer DGR Token)" --> DGR
-    DGR -- "④ JWT 驗證 → 轉發" --> API
-    FE -. "匿名降級 (無 token)" .-> NGX
-    NGX -. "Rate Limit 10 req/min" .-> API
+    FE -- "③ AI 分析 Bearer appJWT" --> API
+    FE -. "匿名 (無 token)" .-> NGX
+    NGX -. "轉發" .-> API
 
-    API --> WF
-    API --> CHAT
+    API -- "取得 DGR token (server-side)" --> DGR
+    API -- "Chat / Workflow" --> WF
+    API -- "Chat / Workflow" --> CHAT
     API --- PG
     API --- RD
-    ETL -- "每日 18:05" --> FM
-    API -- "即時行情" --> TWSE
-
-    style Client fill:#1e3a5f,color:#fff
-    style Gateway fill:#1a3a2a,color:#fff
-    style Platform fill:#3a1a1a,color:#fff
-    style AI fill:#3a2a1a,color:#fff
-    style External fill:#2a2a3a,color:#fff
+    ETL --> FM
+    API --> TWSE
 ```
 
 ### 元件說明

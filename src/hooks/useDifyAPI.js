@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { parseStockData } from '../utils/parser';
 import { saveRecord } from '../utils/history';
 
-const DIGIRUNNER_URL = import.meta.env.VITE_DIGIRUNNER_URL || 'http://localhost:31080';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:9000/gateway';
 
 const useDifyAPI = () => {
@@ -13,7 +13,7 @@ const useDifyAPI = () => {
   const [lastQuery, setLastQuery] = useState(null);
   const [conversationHistory, setConversationHistory] = useState([]);
 
-  const fetchStockAnalysis = async (userSearch, dgrToken = null) => {
+  const fetchStockAnalysis = async (userSearch, appToken = null) => {
     setLastQuery(userSearch);
     setLoading(true);
     setError(null);
@@ -25,20 +25,14 @@ const useDifyAPI = () => {
         .join(' ');
       const contextualQuery = recentContext ? `${recentContext}\n${userSearch}` : userSearch;
 
-      let apiUrl, headers;
-
-      if (dgrToken) {
-        // 走 DigiRunner（帶 JWT 認證 + 審計日誌）
-        apiUrl = `${DIGIRUNNER_URL}/tsmpc/dgrc/ai_analyze`;
-        headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${dgrToken}`,
-        };
-      } else {
-        // 降級：走 nginx gateway（rate limit 保護，無需登入）
-        apiUrl = `${GATEWAY_URL}/ai/analyze`;
-        headers = { 'Content-Type': 'application/json' };
-      }
+      // 統一走 data-platform：登入時帶 App JWT 識別身份，未登入走 nginx gateway（rate limit）
+      const apiUrl = appToken
+        ? `${API_BASE}/api/ai/analyze`
+        : `${GATEWAY_URL}/ai/analyze`;
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(appToken && { 'Authorization': `Bearer ${appToken}` }),
+      };
 
       // Pass the most recent conversation_id for chat mode continuity
       const lastConversationId = conversationHistory.slice(-1)[0]?.conversation_id || null;
@@ -110,7 +104,7 @@ const useDifyAPI = () => {
       const msg = err.message?.includes('429')
         ? '查詢過於頻繁，請稍後再試（每分鐘上限 10 次）。'
         : err.message?.includes('401') || err.message?.includes('403')
-          ? 'DigiRunner 認證失敗，請重新登入。'
+          ? '認證失敗，請重新登入。'
           : err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')
             ? '無法連線至分析服務，請確認各服務是否正常運行。'
             : err.message;
@@ -121,6 +115,7 @@ const useDifyAPI = () => {
   };
 
   const retry = (token) => lastQuery && fetchStockAnalysis(lastQuery, token);
+
   const clearHistory = () => setConversationHistory([]);
 
   return { fetchStockAnalysis, analysisResult, loading, error, lastTicker, retry, clearHistory };
