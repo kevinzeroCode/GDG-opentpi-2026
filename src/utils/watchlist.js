@@ -91,7 +91,8 @@ export const updateAvgCost = (ticker, avgCost) => {
   }
 };
 
-// ── 登入後從後端載入個人自選股（覆蓋本地，保留 shares/avgCost）──
+// ── 從後端同步個人自選股（合併模式：後端 ∪ 本地，避免 race condition）──
+// per-user key 已隔離，不會混入其他人的資料
 export const syncWatchlistFromPlatform = async (token) => {
   try {
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -100,20 +101,19 @@ export const syncWatchlistFromPlatform = async (token) => {
     const data = await res.json();
     const remoteTickers = data.items.map((i) => i.ticker);
 
-    // 保留目前本地的 shares/avgCost（轉成 map 備用）
-    const localMap = Object.fromEntries(
-      getWatchlist().map((i) => [i.ticker, { shares: i.shares, avgCost: i.avgCost }])
-    );
+    const local = getWatchlist();
+    const localTickers = new Set(local.map((i) => i.ticker));
 
-    // 用後端清單覆蓋（不再合併舊本地資料）
-    const merged = remoteTickers.map((t) => ({
-      ticker: t,
-      shares: localMap[t]?.shares || 0,
-      avgCost: localMap[t]?.avgCost || 0,
-    }));
-
-    localStorage.setItem(storageKey(), JSON.stringify(merged));
+    // 把後端有、本地沒有的加進來（保留本地既有的 shares/avgCost）
+    let changed = false;
+    for (const t of remoteTickers) {
+      if (!localTickers.has(t)) {
+        local.push({ ticker: t, shares: 0, avgCost: 0 });
+        changed = true;
+      }
+    }
+    if (changed) localStorage.setItem(storageKey(), JSON.stringify(local));
   } catch {
-    // 後端不可用時靜默忽略
+    // 後端不可用時靜默忽略，本地資料仍正常運作
   }
 };
