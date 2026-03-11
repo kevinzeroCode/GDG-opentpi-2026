@@ -16,12 +16,17 @@ services:
 
   digirunner:
     image: tpisoftwareopensource/digirunner-open-source
+    init: true   # 防止 JVM crash 後產生 zombie container
     ports:
       - "31080:18080"
     environment:
       - TZ=Asia/Taipei
       # 改用 file 模式，資料永久保存在 volume
       - SPRING_DATASOURCE_URL=jdbc:h2:file:/opt/digirunner/data/dgrdb;DB_CLOSE_DELAY=-1;NON_KEYWORDS=VALUE;Mode=MySQL
+      # 固定 TAEASK，確保 TSMP_SETTING 加密值每次重啟後仍可正確解密
+      - TAEASK=tbmhx8
+      # 跳過 schema.sql 初始化（DB volume 已存在資料，避免 INSERT 重複 key 錯誤）
+      - SPRING_SQL_INIT_MODE=never
     volumes:
       - digirunner_data:/opt/digirunner/data   # H2 資料庫檔案
       - digirunner_keys:/opt/digirunner/keys   # 加密金鑰

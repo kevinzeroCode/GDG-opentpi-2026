@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import useDifyAPI from './hooks/useDifyAPI';
+import useAuth from './hooks/useAuth';
 import useTWSELive from './hooks/useTWSELive';
 import GaugeChart from './components/Dashboard/GaugeChart';
 import KDChart from './components/Dashboard/KDChart';
@@ -8,9 +9,9 @@ import MACDChart from './components/Dashboard/MACDChart';
 import HistoryChart from './components/Dashboard/HistoryChart';
 import PriceChart from './components/Dashboard/PriceChart';
 import CandlestickChart from './components/Dashboard/CandlestickChart';
-import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2 } from 'lucide-react';
+import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2, LogIn, LogOut, Shield } from 'lucide-react';
 import Chart from 'react-apexcharts';
-import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares, updateAvgCost } from './utils/watchlist';
+import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares, updateAvgCost, syncWatchlistFromPlatform } from './utils/watchlist';
 import { getHistory } from './utils/history';
 import { getAlerts, saveAlert, removeAlert, checkAlerts, markAlertFired, resetAlert } from './utils/alerts';
 import { getAlertEmail, setAlertEmail, sendAlertEmail } from './utils/emailAlert';
@@ -24,7 +25,12 @@ function App() {
   const [messages, setMessages] = useState([
     { role: 'bot', content: '您好！我是您的量化分析助手。請輸入台股代碼（如：2330），我將為您解析即時數據。' }
   ]);
-  const { fetchStockAnalysis, analysisResult, loading, error, lastTicker, retry } = useDifyAPI();
+  const { fetchStockAnalysis, analysisResult, loading, error, lastTicker, retry, clearHistory } = useDifyAPI();
+  const { user, isLoggedIn, appToken, dgrToken, register, login, logout, authLoading, authError } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authTab, setAuthTab] = useState('login'); // 'login' | 'register'
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ username: '', email: '', password: '' });
   const scrollRef = useRef(null);
   const dashboardRef = useRef(null);
   const [, watchlistTick] = useState(0);
@@ -42,8 +48,40 @@ function App() {
   const batchQuery = async () => {
     for (const item of watchlist) {
       setMessages(prev => [...prev, { role: 'user', content: item.ticker }]);
-      await fetchStockAnalysis(item.ticker);
+      await fetchStockAnalysis(item.ticker, dgrToken);
     }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const ok = await login(loginForm.username, loginForm.password);
+    if (ok) {
+      setShowLoginModal(false);
+      syncWatchlistFromPlatform(sessionStorage.getItem('app_token')).then(() => watchlistTick((n) => n + 1));
+      setMessages(prev => [...prev, {
+        role: 'bot',
+        content: `✅ 已登入（${loginForm.username}）。自選股已與帳號同步，AI 分析已啟用。`
+      }]);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    const ok = await register(registerForm.username, registerForm.email, registerForm.password);
+    if (ok) {
+      setShowLoginModal(false);
+      syncWatchlistFromPlatform(sessionStorage.getItem('app_token')).then(() => watchlistTick((n) => n + 1));
+      setMessages(prev => [...prev, {
+        role: 'bot',
+        content: `✅ 帳號已建立並登入（${registerForm.username}）。歡迎使用 QuantDashboard AI！`
+      }]);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    clearHistory();
+    setMessages(prev => [...prev, { role: 'bot', content: '已登出。後續請求將使用匿名模式。' }]);
   };
 
   const handleExport = async () => {
@@ -70,11 +108,11 @@ function App() {
     const tickers = [...new Set(userQuery.match(/\d{4,6}/g) || [])];
     if (tickers.length > 1) {
       for (const ticker of tickers) {
-        await fetchStockAnalysis(ticker);
+        await fetchStockAnalysis(ticker, dgrToken);
       }
     } else {
       // 嘗試將中文名稱解析為代號（如「台玻」→「1802」）
-      await fetchStockAnalysis(resolveToTicker(userQuery));
+      await fetchStockAnalysis(resolveToTicker(userQuery), dgrToken);
     }
   };
 
@@ -109,11 +147,12 @@ function App() {
     }
   }, [error]);
 
-  // Request notification permission on mount
+  // Request notification permission on mount + 同步自選股從中台
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
+    syncWatchlistFromPlatform(sessionStorage.getItem('app_token')).then(() => watchlistTick((n) => n + 1));
   }, []);
 
   const handleAddAlert = (ticker, indicator, operator, value) => {
@@ -212,13 +251,121 @@ function App() {
           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
             <Bot size={24} className="text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="font-bold text-lg">Quant AI Assistant</h1>
             <div className="text-xs text-green-500 flex items-center gap-1">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> 在線分析中
             </div>
           </div>
+          {/* Auth Status */}
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-emerald-900/40 border border-emerald-700/50 rounded-lg px-2.5 py-1 text-xs text-emerald-400">
+                <Shield size={12} />
+                <span>{user?.username}</span>
+              </div>
+              <button onClick={handleLogout} title="登出"
+                className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => { setShowLoginModal(true); setAuthTab('login'); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700/50 hover:bg-blue-700 border border-blue-600/50 text-xs text-blue-300 hover:text-white transition-colors">
+              <LogIn size={13} />
+              登入 / 註冊
+            </button>
+          )}
         </header>
+
+        {/* Auth Modal */}
+        {showLoginModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-80 shadow-2xl">
+              <div className="flex items-center gap-2 mb-4">
+                <Shield size={18} className="text-blue-400" />
+                <h2 className="font-semibold text-base">帳號驗證</h2>
+                <button onClick={() => setShowLoginModal(false)} className="ml-auto text-slate-500 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              {/* Tabs */}
+              <div className="flex gap-1 bg-slate-800/50 p-1 rounded-xl mb-4">
+                <button
+                  onClick={() => setAuthTab('login')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${authTab === 'login' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  登入
+                </button>
+                <button
+                  onClick={() => setAuthTab('register')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${authTab === 'register' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  註冊
+                </button>
+              </div>
+
+              {authTab === 'login' ? (
+                <form onSubmit={handleLogin} className="space-y-3">
+                  <input
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="帳號"
+                    value={loginForm.username}
+                    onChange={e => setLoginForm(p => ({ ...p, username: e.target.value }))}
+                    autoComplete="username"
+                  />
+                  <input
+                    type="password"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="密碼"
+                    value={loginForm.password}
+                    onChange={e => setLoginForm(p => ({ ...p, password: e.target.value }))}
+                    autoComplete="current-password"
+                  />
+                  {authError && <p className="text-xs text-red-400">{authError}</p>}
+                  <button type="submit" disabled={authLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                    {authLoading ? <Loader2 size={14} className="animate-spin" /> : <LogIn size={14} />}
+                    {authLoading ? '登入中...' : '登入'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} className="space-y-3">
+                  <input
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="帳號（至少 2 個字元）"
+                    value={registerForm.username}
+                    onChange={e => setRegisterForm(p => ({ ...p, username: e.target.value }))}
+                    autoComplete="username"
+                  />
+                  <input
+                    type="email"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="Email"
+                    value={registerForm.email}
+                    onChange={e => setRegisterForm(p => ({ ...p, email: e.target.value }))}
+                    autoComplete="email"
+                  />
+                  <input
+                    type="password"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="密碼（至少 6 個字元）"
+                    value={registerForm.password}
+                    onChange={e => setRegisterForm(p => ({ ...p, password: e.target.value }))}
+                    autoComplete="new-password"
+                  />
+                  {authError && <p className="text-xs text-red-400">{authError}</p>}
+                  <button type="submit" disabled={authLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                    {authLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    {authLoading ? '建立中...' : '建立帳號'}
+                  </button>
+                </form>
+              )}
+              <p className="text-xs text-slate-500 mt-3 text-center">登入後自選股與分析記錄將與帳號同步</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.map((msg, idx) => (
