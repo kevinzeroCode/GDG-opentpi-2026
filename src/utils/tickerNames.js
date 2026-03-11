@@ -122,7 +122,7 @@ export const getTickerShort = (ticker) => {
 export const resolveToTicker = (input) => {
   const trimmed = input.trim();
   // 已是數字代號
-  if (/^\d{4,6}$/.test(trimmed)) return trimmed;
+  if (/^\d{4,6}[A-Za-z]*$/.test(trimmed)) return trimmed;
   // 完全符合
   if (REVERSE_NAMES[trimmed]) return REVERSE_NAMES[trimmed];
   // 模糊比對：輸入包含已知名稱，或已知名稱包含輸入（取最長命中避免誤判）
