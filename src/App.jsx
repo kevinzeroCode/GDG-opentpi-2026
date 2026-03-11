@@ -708,7 +708,7 @@ const WatchlistTab = ({ watchlist, loading, onBatchQuery, onToggle, onSetInput, 
       for (const item of watchlist) {
         try {
           const live = await fetchTWSELive(item.ticker);
-          if (live?.last) results[item.ticker] = live;
+          if (live) results[item.ticker] = live;
         } catch { /* 盤後或查無資料時靜默忽略 */ }
       }
       setLivePrices(results);
