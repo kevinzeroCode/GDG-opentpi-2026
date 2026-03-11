@@ -81,8 +81,8 @@ const useDifyAPI = () => {
       }
 
       // 優先使用 Dify 提取的代號（最準確），其次從輸入字串取數字
-      const tickerMatch = userSearch.match(/\d{4,}/);
-      const ticker = (tickerCode && /^\d{4,6}$/.test(tickerCode.trim()))
+      const tickerMatch = userSearch.match(/\d{4,}[A-Za-z]*/);
+      const ticker = (tickerCode && /^\d{4,6}[A-Za-z]*$/.test(tickerCode.trim()))
         ? tickerCode.trim()
         : tickerMatch
           ? tickerMatch[0]

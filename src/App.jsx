@@ -104,7 +104,7 @@ function App() {
     setInput('');
 
     // 偵測輸入中所有股票代號（4~6位數字），支援多股同時查詢
-    const tickers = [...new Set(userQuery.match(/\d{4,6}/g) || [])];
+    const tickers = [...new Set(userQuery.match(/\d{4,6}[A-Za-z]*/g) || [])];
     if (tickers.length > 1) {
       for (const ticker of tickers) {
         await fetchStockAnalysis(ticker, appToken);

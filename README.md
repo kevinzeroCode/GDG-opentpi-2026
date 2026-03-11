@@ -248,7 +248,13 @@ GDG/
 - [x] ETL 持久化（`etl_runs` table）
 - [x] Redis 快取即時行情
 
-### 🔲 Phase 3 — 雲端部署（待實現）
+### ✅ Phase 2.5 — 即時功能修正
+- [x] 槓桿型 ETF（`00631L` 等）ticker 正則修正（保留字母後綴）
+- [x] TWSE 空殼回應過濾（無名稱且無價格時回傳 404，而非全 null 200）
+- [x] Redis 快取 null 資料修正（重啟後清除）
+- [x] K 線圖 / 價格走勢隨查詢股票正確切換（`lastTicker` 更新路徑修正）
+
+### 🔲 Phase 3 — 雲端部署（待辦）
 - [ ] 獨立 PostgreSQL（data-platform 脫離 Dify 共用 DB）
 - [ ] Docker image 推上 GHCR（GitHub Container Registry）
 - [ ] CI/CD Pipeline（GitHub Actions：lint → test → build → deploy）
