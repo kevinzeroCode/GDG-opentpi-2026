@@ -1,5 +1,10 @@
 # QuantDashboard AI — 智能台股量化分析助手
 
+[![CI](https://github.com/kevinzeroCode/GDG-opentpi-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinzeroCode/GDG-opentpi-2026/actions/workflows/ci.yml)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+
 > 基於 **React + Vite** 前端、**FastAPI** 數據中台、**Dify.ai** AI 對話引擎、**DigiRunner** JWT API Gateway 的全端台股量化分析平台。
 > 支援使用者系統、多輪對話、即時技術指標分析與投資組合管理。
 
@@ -257,7 +262,7 @@ GDG/
 ### 🔲 Phase 3 — 雲端部署（待辦）
 - [ ] 獨立 PostgreSQL（data-platform 脫離 Dify 共用 DB）
 - [ ] Docker image 推上 GHCR（GitHub Container Registry）
-- [ ] CI/CD Pipeline（GitHub Actions：lint → test → build → deploy）
+- [x] CI Pipeline（GitHub Actions：build 自動驗證）
 - [ ] 部署至雲端（GCP Cloud Run / Fly.io / AWS EC2）
 - [ ] HTTPS + 自訂網域（Let's Encrypt via Caddy / Cloudflare）
 - [ ] 生產環境 SECRET 管理（GitHub Secrets / GCP Secret Manager）
