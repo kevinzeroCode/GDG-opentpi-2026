@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          VITE_GATEWAY_URL: http://localhost:9000/gateway
+          VITE_DIGIRUNNER_URL: http://localhost:31080
+          VITE_EMAILJS_SERVICE_ID: placeholder
+          VITE_EMAILJS_TEMPLATE_ID: placeholder
+          VITE_EMAILJS_PUBLIC_KEY: placeholder
