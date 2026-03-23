@@ -173,15 +173,20 @@ function App() {
   const metrics = analysisResult?.metrics;
   const { data: liveData, error: liveError } = useTWSELive(lastTicker);
 
-  // 背景自動輪詢：每 5 秒對所有有 PRICE 警報的股票查詢即時價格並比對
+  const [alertServiceStatus, setAlertServiceStatus] = useState('ok'); // 'ok' | 'error'
+
+  // 背景自動輪詢：每 2 秒對所有有 PRICE 警報的股票查詢即時價格並比對
   useEffect(() => {
     const runCheck = async () => {
       const active = getAlerts().filter((a) => a.enabled && !a.firedAt && a.indicator === 'price');
       const tickers = [...new Set(active.map((a) => a.ticker))];
+      if (tickers.length === 0) return;
+      let anyError = false;
       for (const t of tickers) {
         try {
           const live = await fetchTWSELive(t);
           if (!live?.last) continue;
+          setAlertServiceStatus('ok');
           const hits = checkAlerts(t, { price: live.last });
           if (hits.length > 0) {
             setTriggeredAlerts((prev) => [...prev, ...hits]);
@@ -195,12 +200,13 @@ function App() {
             });
           }
         } catch {
-          // 盤後 / 無資料時靜默忽略
+          anyError = true;
         }
       }
+      if (anyError) setAlertServiceStatus('error');
     };
     runCheck();
-    const id = setInterval(runCheck, 5000);
+    const id = setInterval(runCheck, 2000);
     return () => clearInterval(id);
   }, []);
 
@@ -496,6 +502,7 @@ function App() {
                 ticker={lastTicker}
                 alerts={alerts}
                 triggeredAlerts={triggeredAlerts}
+                serviceStatus={alertServiceStatus}
                 onAdd={handleAddAlert}
                 onRemove={handleRemoveAlert}
                 onReset={handleResetAlert}
@@ -580,7 +587,7 @@ const INDICATORS = [
   { value: 'price', label: '價格' },
 ];
 
-const AlertPanel = ({ ticker, alerts, triggeredAlerts, onAdd, onRemove, onReset }) => {
+const AlertPanel = ({ ticker, alerts, triggeredAlerts, serviceStatus, onAdd, onRemove, onReset }) => {
   const [alertTicker, setAlertTicker] = useState(ticker || '');
   const [indicator, setIndicator] = useState('rsi');
   const [operator, setOperator] = useState('>');
@@ -603,6 +610,14 @@ const AlertPanel = ({ ticker, alerts, triggeredAlerts, onAdd, onRemove, onReset 
         <Bell size={14} className="text-amber-400" />
         <span className="text-xs text-slate-400 uppercase font-medium">智慧警報</span>
       </div>
+
+      {/* Service status warning */}
+      {serviceStatus === 'error' && (
+        <div className="mb-3 flex items-center gap-1.5 text-xs bg-red-900/30 border border-red-700/50 text-red-400 px-3 py-1.5 rounded-lg">
+          <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+          即時報價服務暫時無法連線，警報暫停偵測
+        </div>
+      )}
 
       {/* Email input */}
       <div className="flex items-center gap-1.5 mb-3">

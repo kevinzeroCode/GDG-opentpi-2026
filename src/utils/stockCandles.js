@@ -68,8 +68,8 @@ export const fetchStockCandles = async (ticker) => {
     if (cached.fetchedAt === today) return cached.data;
   }
 
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-  const url = `${API_BASE}/api/stock/${ticker}/candles?start_date=${startDate}`;
+  const url = `/finmind/api/v4/data?dataset=TaiwanStockPrice&data_id=${ticker}&start_date=${startDate}`;
+
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
