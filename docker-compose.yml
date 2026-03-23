@@ -1,37 +1,29 @@
-version: '3.8'
-services:
-  frontend:
-    build: .
-    ports:
-      - "5173:5173"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    env_file:
-      - .env
-    environment:
-      - CHOKIDAR_USEPOLLING=true # 確保 Windows 下熱更新正常
-    depends_on:
-      - digirunner
+  services:
+    frontend:
+      build: .
+      ports:
+        - "5173:5173"
+      env_file:
+        - .env
+      depends_on:
+        - digirunner
 
-  digirunner:
-    image: tpisoftwareopensource/digirunner-open-source
-    init: true   # 防止 JVM crash 後產生 zombie container
-    ports:
-      - "31080:18080"
-    environment:
-      - TZ=Asia/Taipei
-      # 改用 file 模式，資料永久保存在 volume
-      - SPRING_DATASOURCE_URL=jdbc:h2:file:/opt/digirunner/data/dgrdb;DB_CLOSE_DELAY=-1;NON_KEYWORDS=VALUE;Mode=MySQL
-      # 固定 TAEASK，確保 TSMP_SETTING 加密值每次重啟後仍可正確解密
-      - TAEASK=tbmhx8
-      # 跳過 schema.sql 初始化（DB volume 已存在資料，避免 INSERT 重複 key 錯誤）
-      - SPRING_SQL_INIT_MODE=never
-    volumes:
-      - digirunner_data:/opt/digirunner/data   # H2 資料庫檔案
-      - digirunner_keys:/opt/digirunner/keys   # 加密金鑰
-    restart: unless-stopped
+    digirunner:
+      image: tpisoftwareopensource/digirunner-open-source
+      ports:
+        - "31080:18080"
+      environment:
+        - TZ=Asia/Taipei
+        - SPRING_DATASOURCE_URL=jdbc:h2:file:/opt/digirunner/data/dgrdb;DB_CLOSE_DELAY=-1;NON_KEYWORDS=VALUE;Mode=MySQL
+        - SPRING_SQL_INIT_CONTINUE_ON_ERROR=true
+        - JAVA_OPTS=-Xms512m -Xmx2g -XX:TieredStopAtLevel=1 -XX:+UseG1GC
+        - SPRING_MAIN_LAZY_INITIALIZATION=true
+      volumes:
+        - digirunner_data:/opt/digirunner/data
+        - digirunner_keys:/opt/digirunner/keys
+      restart: unless-stopped
 
-volumes:
-  digirunner_data:
-  digirunner_keys:
+
+  volumes:
+    digirunner_data:
+    digirunner_keys:
