@@ -1,0 +1,100 @@
+app:
+  description: 台股技術分析對話助手，支援多輪對話查詢股票指標與趨勢
+  icon: 📈
+  icon_background: '#1C64F2'
+  mode: chat
+  name: 股票分析助手 Chat
+  use_icon_as_answer_icon: false
+kind: app
+model_config:
+  agent_mode:
+    enabled: false
+    max_iteration: 5
+    strategy: react_router
+    tools: []
+  annotation_reply:
+    enabled: false
+  chat_prompt_config: {}
+  completion_prompt_config: {}
+  dataset_configs:
+    datasets:
+      datasets: []
+    reranking_enable: false
+    retrieval_model: single
+    top_k: 2
+  dataset_query_variable: ''
+  external_data_tools: []
+  file_upload:
+    allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+    allowed_file_types:
+      - image
+    allowed_file_upload_methods:
+      - local_file
+      - remote_url
+    enabled: false
+    image:
+      detail: high
+      enabled: false
+      number_limits: 3
+      transfer_methods:
+        - local_file
+        - remote_url
+    number_limits: 3
+  model:
+    completion_params:
+      stop: []
+      temperature: 0.5
+    mode: chat
+    name: gemini-2.5-flash
+    provider: langgenius/gemini/google
+  more_like_this:
+    enabled: false
+  opening_statement: |
+    您好！我是台股技術分析助手 📈
+
+    請輸入股票代號或名稱，例如：
+    - 「2330 台積電分析」
+    - 「聯發科 2454 現在怎麼樣？」
+    - 「幫我看一下 2317 鴻海」
+
+    我會分析最新的價格、RSI、KD、MACD 等技術指標。
+  pre_prompt: |
+    你是一個專業的台灣股票技術分析助手。用戶會輸入台股代號（4~6位數字）或股票名稱，
+    你的任務是：
+    1. 從用戶的輸入中識別股票代號（ticker_code）
+    2. 根據提供的技術指標數據，給出清晰的技術分析評論
+    3. 支援多輪對話，記住上下文（例如：「那麼友達呢？」要理解用戶在繼續問另一支股票）
+
+    輸出格式要求：
+    - 使用繁體中文
+    - 先說明目前趨勢（多頭/空頭/盤整）
+    - 提及關鍵指標數值（RSI、KD、MACD）
+    - 給出簡短的操作建議
+    - 語氣專業但親切
+
+    注意：你只做技術分析，不做投資建議，每次回答結尾加上「本分析僅供參考，投資需自負風險。」
+
+    當前查詢：{{#sys.query#}}
+  prompt_type: simple
+  retriever_resource:
+    enabled: false
+  sensitive_word_avoidance:
+    enabled: false
+  speech_to_text:
+    enabled: false
+  suggested_questions:
+    - 台積電 2330 現在趨勢如何？
+    - 幫我分析鴻海 2317
+    - 聯發科 2454 KD 指標怎麼看？
+  suggested_questions_after_answer:
+    enabled: true
+  text_to_speech:
+    enabled: false
+  user_input_form: []
+version: 0.1.5
