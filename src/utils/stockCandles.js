@@ -69,6 +69,7 @@ export const fetchStockCandles = async (ticker) => {
   }
 
   const url = `/finmind/api/v4/data?dataset=TaiwanStockPrice&data_id=${ticker}&start_date=${startDate}`;
+
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
