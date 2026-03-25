@@ -29,7 +29,7 @@ function App() {
   const { user, isLoggedIn, appToken, dgrToken, register, login, logout, authLoading, authError } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authTab, setAuthTab] = useState('login'); // 'login' | 'register'
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ username: '', email: '', password: '' });
   const scrollRef = useRef(null);
   const dashboardRef = useRef(null);
@@ -55,13 +55,12 @@ function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const ok = await login(loginForm.username, loginForm.password);
+    const ok = await login(loginForm.email, loginForm.password);
     if (ok) {
       setShowLoginModal(false);
-      syncWatchlistFromPlatform(sessionStorage.getItem('app_token')).then(() => watchlistTick((n) => n + 1));
       setMessages(prev => [...prev, {
         role: 'bot',
-        content: `✅ 已登入（${loginForm.username}）。自選股已與帳號同步，AI 分析已啟用。`
+        content: `✅ 已登入。歡迎回來！`
       }]);
     }
   };
@@ -71,7 +70,6 @@ function App() {
     const ok = await register(registerForm.username, registerForm.email, registerForm.password);
     if (ok) {
       setShowLoginModal(false);
-      syncWatchlistFromPlatform(sessionStorage.getItem('app_token')).then(() => watchlistTick((n) => n + 1));
       setMessages(prev => [...prev, {
         role: 'bot',
         content: `✅ 帳號已建立並登入（${registerForm.username}）。歡迎使用 QuantDashboard AI！`
@@ -104,16 +102,7 @@ function App() {
     setMessages(prev => [...prev, { role: 'user', content: userQuery }]);
     setInput('');
 
-    // 偵測輸入中所有股票代號（4~6位數字），支援多股同時查詢
-    const tickers = [...new Set(userQuery.match(/\d{4,6}[A-Za-z]*/g) || [])];
-    if (tickers.length > 1) {
-      for (const ticker of tickers) {
-        await fetchStockAnalysis(ticker, appToken);
-      }
-    } else {
-      // 嘗試將中文名稱解析為代號（如「台玻」→「1802」）
-      await fetchStockAnalysis(resolveToTicker(userQuery), appToken);
-    }
+    await fetchStockAnalysis(resolveToTicker(userQuery), appToken);
   };
 
   useEffect(() => {
@@ -318,11 +307,12 @@ function App() {
               {authTab === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-3">
                   <input
+                    type="email"
                     className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                    placeholder="帳號"
-                    value={loginForm.username}
-                    onChange={e => setLoginForm(p => ({ ...p, username: e.target.value }))}
-                    autoComplete="username"
+                    placeholder="Email"
+                    value={loginForm.email}
+                    onChange={e => setLoginForm(p => ({ ...p, email: e.target.value }))}
+                    autoComplete="email"
                   />
                   <input
                     type="password"
