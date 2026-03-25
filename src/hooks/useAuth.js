@@ -1,81 +1,83 @@
-import { useState, useCallback } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { useState, useCallback, useEffect } from 'react';
+import { auth } from '../firebase';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  onAuthStateChanged,
+} from 'firebase/auth';
 
 const useAuth = () => {
-  const stored = () => {
-    try { return JSON.parse(sessionStorage.getItem('auth_user') || 'null'); } catch { return null; }
-  };
-  const [user, setUser] = useState(stored);
-  const [authLoading, setAuthLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  const saveSession = (data) => {
-    sessionStorage.setItem('auth_user', JSON.stringify({
-      user_id: data.user_id,
-      username: data.username,
-      email: data.email,
-    }));
-    sessionStorage.setItem('app_token', data.access_token);
-    if (data.dgr_token) sessionStorage.setItem('dgr_access_token', data.dgr_token);
-    setUser({ user_id: data.user_id, username: data.username, email: data.email });
-  };
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          user_id: firebaseUser.uid,
+          username: firebaseUser.displayName || firebaseUser.email,
+          email: firebaseUser.email,
+        });
+      } else {
+        setUser(null);
+      }
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   const register = useCallback(async (username, email, password) => {
     setAuthLoading(true);
     setAuthError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || '註冊失敗');
-      saveSession(data);
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(credential.user, { displayName: username });
+      setUser({ user_id: credential.user.uid, username, email });
       return true;
     } catch (err) {
-      setAuthError(err.message);
+      const msg =
+        err.code === 'auth/email-already-in-use' ? '此 Email 已被使用' :
+        err.code === 'auth/weak-password' ? '密碼至少需要 6 個字元' :
+        err.code === 'auth/invalid-email' ? 'Email 格式不正確' :
+        err.message;
+      setAuthError(msg);
       return false;
     } finally {
       setAuthLoading(false);
     }
   }, []);
 
-  const login = useCallback(async (username, password) => {
+  const login = useCallback(async (email, password) => {
     setAuthLoading(true);
     setAuthError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || '登入失敗');
-      saveSession(data);
+      await signInWithEmailAndPassword(auth, email, password);
       return true;
     } catch (err) {
-      setAuthError(err.message);
+      const msg =
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+          ? 'Email 或密碼錯誤'
+          : err.message;
+      setAuthError(msg);
       return false;
     } finally {
       setAuthLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
-    sessionStorage.removeItem('auth_user');
-    sessionStorage.removeItem('app_token');
-    sessionStorage.removeItem('dgr_access_token');
-    sessionStorage.removeItem('dgr_user');
+  const logout = useCallback(async () => {
+    await signOut(auth);
     setUser(null);
   }, []);
 
-  const appToken = sessionStorage.getItem('app_token');
-  const dgrToken = sessionStorage.getItem('dgr_access_token');
   const isLoggedIn = !!user;
 
-  return { user, isLoggedIn, appToken, dgrToken, register, login, logout, authLoading, authError };
+  return { user, isLoggedIn, appToken: null, dgrToken: null, register, login, logout, authLoading, authError };
 };
 
 export default useAuth;

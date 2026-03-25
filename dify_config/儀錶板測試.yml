@@ -126,10 +126,22 @@ workflow:
     - data:
         isInLoop: false
         sourceType: code
-        targetType: end
-      id: 1771658568086-source-1770909970504-target
+        targetType: llm
+      id: 1771658568086-source-1771900000001-target
       selected: false
       source: '1771658568086'
+      sourceHandle: source
+      target: '1771900000001'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1771900000001-source-1770909970504-target
+      selected: false
+      source: '1771900000001'
       sourceHandle: source
       target: '1770909970504'
       targetHandle: target
@@ -175,7 +187,7 @@ workflow:
       type: custom
       width: 242
     - data:
-        instruction: 請從用戶的話中提取股票代號。如果是中文名稱（如台積電），請轉換為代號（2330）。若輸入是一般問題而非股票查詢，請回傳空字串。
+        instruction: "你的任務是判斷用戶是否在查詢「單一股票」，並提取代號。請嚴格遵守以下規則：\n\n【必須回傳空字串的情況，不可提取任何代號】\n1. 輸入中出現兩個或以上的股票代號（4到6位數字）\n2. 輸入包含「比較」、「和」、「vs」、「versus」、「哪支」、「選出」、「推薦」、「哪個比較好」等字眼\n3. 輸入是一般投資知識問題（如：RSI是什麼、如何設停損）\n4. 輸入是市場行情或總經問題\n5. 輸入要求從多支股票中篩選標的\n\n【可以提取代號的情況】\n- 輸入只提到「一支股票」，且沒有比較或篩選的意圖\n- 例如：「2330分析」、「台積電走勢」、「0050現在怎樣」\n- 若是中文股票名稱，轉換為代號（台積電→2330、鴻海→2317、元大台灣50→0050）\n\n判斷範例：\n- 「2330」→ 回傳 2330\n- 「台積電怎麼樣」→ 回傳 2330\n- 「0050 和 2330比較」→ 回傳空字串（有兩個代號且有比較意圖）\n- 「2330 2317 哪支比較好」→ 回傳空字串\n- 「RSI超買了嗎」→ 回傳空字串（一般問題）\n- 「幫我從這幾支選出當沖標的：6187 5871 9941」→ 回傳空字串"
         model:
           completion_params:
             temperature: 0.3
@@ -335,7 +347,48 @@ workflow:
       type: custom
       width: 241
     - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.75
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: sys-stock
+          role: system
+          text: "你是一位專業的台股技術分析師，請根據以下技術指標數據，用繁體中文以自然段落方式給出分析評論（約4到6句話）。\n\n說話風格要像真人分析師在對話，不要使用條列式或標題格式，直接用流暢的文字說明：\n- 目前整體趨勢（多頭或空頭），MA5與MA20的關係\n- RSI、KD、MACD的綜合訊號代表什麼意思\n- 短線上值得注意的關鍵點或操作思路\n\n最後用一句話加上免責聲明，例如：「以上為技術分析參考，不構成投資建議。」\n\n重要：不要使用 Markdown 標題、粗體、條列符號，就像在對話一樣自然說話。"
+        - id: user-stock
+          role: user
+          text: "股票代號：{{#1770907528913.ticker#}}\n技術指標：{{#1771658568086.result#}}"
+        selected: false
+        title: 股票分析評論
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 99
+      id: '1771900000001'
+      position:
+        x: 1580
+        y: 180
+      positionAbsolute:
+        x: 1580
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
         outputs:
+        - value_selector:
+          - '1771900000001'
+          - text
+          value_type: string
+          variable: commentary
         - value_selector:
           - '1771658568086'
           - result
@@ -375,10 +428,7 @@ workflow:
         prompt_template:
         - id: sys-general
           role: system
-          text: "你是一位台股投資助理，能回答各種投資相關問題，語氣親切易懂，適合一般投資人。\n\n你可以協助的範圍：\n📚 解釋技術指標（RSI、MACD、KD、均線、布林通道等）\n\
-            💡 說明投資基本概念與策略（長期投資、波段操作、停損設定等）\n🏢 介紹台股市場運作（交易時間、漲跌停、融資融券等）\n📰 回答一般財經與總經問題\n\
-            🔍 比較不同投資工具的優缺點\n\n若用戶想查詢個股技術分析，請引導他們輸入股票代號（4到6位數字），例如：\n- 2330（台積電）\n\
-            - 0050（元大台灣50）\n- 2317（鴻海）\n\n回答時若涉及投資操作建議，最後加上適當免責聲明。"
+          text: "你是一位專業的台股投資助理，語氣親切自然，像朋友在聊天，不要太正式或制式。\n\n【你可以處理的問題類型】\n\n1. 一般投資知識：解釋技術指標（RSI、MACD、KD、均線等）、投資策略、市場運作、總經問題。\n\n2. 多股比較或篩選：用戶提供多個股票代號並想比較或選出標的時，你沒有這些股票的即時數據，但你可以：\n   - 根據用戶提供的代號，說明各股的產業特性和一般認知（若你知道的話）\n   - 提供比較或篩選的思考框架（例如當沖要看：成交量>5億、波動率、籌碼集中度）\n   - 引導用戶逐一輸入代號查詢即時指標後，再做決策\n   - 如果用戶已在對話中提供了某些股票的指標數據，直接幫他分析比較\n\n3. 對話延續：用戶可能在前面已查詢過某支股票，這時可能會問「那和另一支比較呢」，請根據對話上下文回應。\n\n【重要原則】\n- 說話自然流暢，不要用太多標題和條列，像在對話\n- 不要捏造即時股價或指標數值\n- 涉及操作建議時，最後加上一句免責聲明\n- 如果問題超出你的能力範圍，直接說明並引導用戶輸入股票代號查詢"
         - id: user-general
           role: user
           text: "{{#1770907397757.query#}}"
