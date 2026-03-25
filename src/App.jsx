@@ -38,6 +38,7 @@ function App() {
   const [, alertTick] = useState(0);
   const alerts = getAlerts();
   const [triggeredAlerts, setTriggeredAlerts] = useState([]);
+  const [recentTickers, setRecentTickers] = useState([]);
 
   const toggleWatchlist = (ticker) => {
     if (isInWatchlist(ticker)) removeFromWatchlist(ticker);
@@ -121,6 +122,10 @@ function App() {
         || generateCommentary(lastTicker, analysisResult.metrics)
         || analysisResult.rawText;
       setMessages(prev => [...prev, { role: 'bot', content: commentary }]);
+      // Update recent tickers list
+      if (lastTicker) {
+        setRecentTickers(prev => [lastTicker, ...prev.filter(t => t !== lastTicker)].slice(0, 5));
+      }
       // Check alerts (only for stock queries with real metrics)
       if (analysisResult.metrics && lastTicker) {
         const hits = checkAlerts(lastTicker, analysisResult.metrics);
@@ -436,9 +441,12 @@ function App() {
       <div className="w-full md:w-[400px] bg-slate-900/50 flex flex-col overflow-hidden min-h-[40vh] md:min-h-0">
         {/* Tab Header */}
         <div className="p-4 pb-0">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <h3 className="text-slate-400 font-bold flex items-center gap-2 uppercase tracking-wider text-sm">
               <BarChart3 size={18} /> 即時量化數據
+              {lastTicker && (
+                <span className="text-blue-400 normal-case font-mono text-sm">{lastTicker}</span>
+              )}
             </h3>
             {metrics && (
               <button onClick={handleExport} className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-400 transition-colors">
@@ -446,6 +454,26 @@ function App() {
               </button>
             )}
           </div>
+          {recentTickers.length > 1 && (
+            <div className="flex gap-1 flex-wrap mb-2">
+              {recentTickers.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => {
+                    setMessages(prev => [...prev, { role: 'user', content: t }]);
+                    fetchStockAnalysis(t);
+                  }}
+                  className={`text-xs px-2 py-0.5 rounded-full font-mono transition-colors ${
+                    t === lastTicker
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-200'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex gap-1 bg-slate-800/50 p-1 rounded-xl">
             {tabs.map((tab, i) => (
               <button
