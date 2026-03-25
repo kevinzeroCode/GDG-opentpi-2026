@@ -126,10 +126,22 @@ workflow:
     - data:
         isInLoop: false
         sourceType: code
-        targetType: end
-      id: 1771658568086-source-1770909970504-target
+        targetType: llm
+      id: 1771658568086-source-1771900000001-target
       selected: false
       source: '1771658568086'
+      sourceHandle: source
+      target: '1771900000001'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1771900000001-source-1770909970504-target
+      selected: false
+      source: '1771900000001'
       sourceHandle: source
       target: '1770909970504'
       targetHandle: target
@@ -335,7 +347,49 @@ workflow:
       type: custom
       width: 241
     - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.75
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: sys-stock
+          role: system
+          text: "你是一位專業的台股技術分析師，請根據以下技術指標數據，用繁體中文給出簡潔的分析評論（3-5句話）。\n\n分析重點：\n\
+            - 目前趨勢判斷（多頭/空頭）\n- RSI 是否超買或超賣\n- MACD 訊號方向\n- 短期操作建議\n\n最後加上免責聲明：「以上為技術分析參考，不構成投資建議。」"
+        - id: user-stock
+          role: user
+          text: "股票代號：{{#1770907528913.ticker#}}\n技術指標：{{#1771658568086.result#}}"
+        selected: false
+        title: 股票分析評論
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 99
+      id: '1771900000001'
+      position:
+        x: 1580
+        y: 180
+      positionAbsolute:
+        x: 1580
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
         outputs:
+        - value_selector:
+          - '1771900000001'
+          - text
+          value_type: string
+          variable: commentary
         - value_selector:
           - '1771658568086'
           - result
