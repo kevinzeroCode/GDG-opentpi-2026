@@ -4,9 +4,8 @@ services:
     build: .
     ports:
       - "80:80"
-    environment:
-      # DIFY_API_KEY 從伺服器的 shell 環境變數傳入，不寫進任何檔案
-      - DIFY_API_KEY=${DIFY_API_KEY}
+    env_file:
+      - .env.server
     depends_on:
       - digirunnner
     restart: unless-stopped
