@@ -3,25 +3,25 @@ services:
   frontend:
     build: .
     ports:
-      - "5173:5173"
-    env_file:
-      - .env
+      - "80:80"
+    environment:
+      # DIFY_API_KEY 從伺服器的 shell 環境變數傳入，不寫進任何檔案
+      - DIFY_API_KEY=${DIFY_API_KEY}
     depends_on:
-      - digirunner
+      - digirunnner
+    restart: unless-stopped
 
-  digirunner:
+  digirunnner:
     image: tpisoftwareopensource/digirunner-open-source
     ports:
       - "31080:18080"
     environment:
       - TZ=Asia/Taipei
-      # 改用 file 模式，資料永久保存在 volume
       - SPRING_DATASOURCE_URL=jdbc:h2:file:/opt/digirunner/data/dgrdb;DB_CLOSE_DELAY=-1;NON_KEYWORDS=VALUE;Mode=MySQL
-      # 忽略初始化 SQL 的重複 key 錯誤，避免重啟時 crash loop
       - SPRING_SQL_INIT_CONTINUE_ON_ERROR=true
     volumes:
-      - digirunner_data:/opt/digirunner/data   # H2 資料庫檔案
-      - digirunner_keys:/opt/digirunner/keys   # 加密金鑰
+      - digirunner_data:/opt/digirunner/data
+      - digirunner_keys:/opt/digirunner/keys
     restart: unless-stopped
 
 volumes:

@@ -1,18 +1,15 @@
-# 使用 Node.js 官方鏡像
-FROM node:20-alpine
-
-# 設定容器內的工作目錄
+# Stage 1: Build
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# 複製 package.json 並安裝依賴
 COPY package*.json ./
-RUN npm install
-
-# 複製所有專案內容
+RUN npm ci
 COPY . .
+RUN npm run build
 
-# 曝露 Vite 預設端口
-EXPOSE 5173
+# Stage 2: Production serve with nginx
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# 啟動開發伺服器，並允許外部連線
-CMD ["npm", "run", "dev", "--", "--host"]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
