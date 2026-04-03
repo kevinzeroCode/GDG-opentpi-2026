@@ -15,13 +15,14 @@ const useDifyAPI = () => {
     setError(null);
 
     try {
-      const apiUrl = import.meta.env.VITE_DIFY_API_URL + '/workflows/run';
+      // 使用相對路徑，由 nginx server-side proxy 加上 Authorization header
+      // API Key 不出現在前端程式碼或瀏覽器中
+      const apiUrl = '/dify/v1/workflows/run';
 
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DIFY_API_KEY}`
         },
         body: JSON.stringify({
           inputs: { query: userSearch },
