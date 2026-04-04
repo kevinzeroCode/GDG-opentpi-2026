@@ -255,7 +255,7 @@ function App() {
   const tabs = [
     { label: '總覽', icon: <BarChart3 size={14} /> },
     { label: '技術指標', icon: <Activity size={14} /> },
-    { label: '歷史趨勢', icon: <Clock size={14} /> },
+    { label: '分析紀錄', icon: <Clock size={14} /> },
     { label: '自選', icon: <Star size={14} /> },
   ];
 
@@ -512,7 +512,7 @@ function App() {
               onAvgCostChange={(ticker, cost) => { updateAvgCost(ticker, cost); watchlistTick((n) => n + 1); }}
             />
           ) : activeTab === 2 ? (
-            <HistoryChart ticker={lastTicker} />
+            <HistoryChart ticker={lastTicker} user={user} />
           ) : activeTab === 1 ? (
             <div className="flex flex-col gap-4">
               {/* KD / MACD / 綜合訊號：有資料才顯示 */}
