@@ -12,6 +12,7 @@ import CandlestickChart from './components/Dashboard/CandlestickChart';
 import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2, LogIn, LogOut, Shield } from 'lucide-react';
 import Chart from 'react-apexcharts';
 import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares, updateAvgCost, syncWatchlistFromPlatform } from './utils/watchlist';
+import { saveAnalysis, addWatchlistItem, removeWatchlistItem, getWatchlistFromFirestore } from './utils/firestore';
 import { getHistory } from './utils/history';
 import { getAlerts, saveAlert, removeAlert, checkAlerts, markAlertFired, resetAlert } from './utils/alerts';
 import { getAlertEmail, setAlertEmail, sendAlertEmail } from './utils/emailAlert';
@@ -41,8 +42,13 @@ function App() {
   const [recentTickers, setRecentTickers] = useState([]);
 
   const toggleWatchlist = (ticker) => {
-    if (isInWatchlist(ticker)) removeFromWatchlist(ticker);
-    else addToWatchlist(ticker);
+    if (isInWatchlist(ticker)) {
+      removeFromWatchlist(ticker);
+      if (user) removeWatchlistItem(user.user_id, ticker);
+    } else {
+      addToWatchlist(ticker);
+      if (user) addWatchlistItem(user.user_id, ticker);
+    }
     watchlistTick((n) => n + 1);
   };
 
@@ -111,6 +117,10 @@ function App() {
         || generateCommentary(lastTicker, analysisResult.metrics)
         || analysisResult.rawText;
       setMessages(prev => [...prev, { role: 'bot', content: commentary }]);
+      // 登入狀態下，把分析紀錄（含 AI commentary）存進 Firestore
+      if (user && lastTicker) {
+        saveAnalysis(user.user_id, lastTicker, analysisResult.metrics, commentary);
+      }
       // Update recent tickers list
       if (lastTicker) {
         setRecentTickers(prev => [lastTicker, ...prev.filter(t => t !== lastTicker)].slice(0, 5));
@@ -140,13 +150,21 @@ function App() {
     }
   }, [error]);
 
-  // Request notification permission on mount + 同步自選股從中台
+  // Request notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    syncWatchlistFromPlatform(sessionStorage.getItem('app_token')).then(() => watchlistTick((n) => n + 1));
   }, []);
+
+  // 登入後從 Firestore 同步自選股到 localStorage
+  useEffect(() => {
+    if (!user) return;
+    getWatchlistFromFirestore(user.user_id).then((tickers) => {
+      tickers.forEach((t) => addToWatchlist(t));
+      watchlistTick((n) => n + 1);
+    });
+  }, [user]);
 
   const handleAddAlert = (ticker, indicator, operator, value) => {
     if (!ticker) return;
