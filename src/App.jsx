@@ -941,8 +941,8 @@ const LivePriceCard = ({ data, error }) => {
     <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5 text-xs text-slate-500 uppercase font-medium">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-          即時行情
+          <span className={`w-1.5 h-1.5 rounded-full ${data.isLive ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`} />
+          {data.isLive ? '即時行情' : '昨日收盤'}
         </div>
         <div className="text-right">
           <div className="text-[10px] text-slate-500">{data.date ? `${data.date.slice(0,4)}/${data.date.slice(4,6)}/${data.date.slice(6,8)}` : ''}</div>

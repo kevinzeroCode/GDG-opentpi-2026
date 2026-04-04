@@ -1,16 +1,22 @@
   const PROXY = '/twse/stock/api/getStockInfo.jsp';
 
-  const parse = (d) => ({
-    name: d.n,
-    open: parseFloat(d.o) || null,
-    high: parseFloat(d.h) || null,
-    low: parseFloat(d.l) || null,
-    last: parseFloat(d.z) || null,
-    prevClose: parseFloat(d.y) || null,
-    volume: parseInt(d.v, 10) || null,
-    time: d.t,
-    date: d.d,
-  });
+  const parse = (d) => {
+    const zLast = parseFloat(d.z);
+    const yPrev = parseFloat(d.y);
+    const isLive = !isNaN(zLast) && zLast > 0;
+    return {
+      name: d.n,
+      open: parseFloat(d.o) || null,
+      high: parseFloat(d.h) || null,
+      low: parseFloat(d.l) || null,
+      last: isLive ? zLast : (!isNaN(yPrev) ? yPrev : null),
+      prevClose: !isNaN(yPrev) ? yPrev : null,
+      isLive,
+      volume: parseInt(d.v, 10) || null,
+      time: d.t,
+      date: d.d,
+    };
+  };
 
   export const fetchTWSELive = async (ticker) => {
     if (!ticker) return null;
