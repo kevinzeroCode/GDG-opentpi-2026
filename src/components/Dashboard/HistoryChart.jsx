@@ -1,84 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, LogIn } from 'lucide-react';
+import { Newspaper, ExternalLink, LogIn, Clock } from 'lucide-react';
 import { getAnalysisHistory } from '../../utils/firestore';
 import { getTickerShort } from '../../utils/tickerNames';
 
-const SignalBadge = ({ metrics }) => {
-  if (!metrics) return null;
-  const rsi = metrics.rsi;
-  if (rsi === undefined) return null;
-
-  if (rsi >= 70) return (
-    <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-700/40">
-      <TrendingDown size={10} /> 偏空
-    </span>
-  );
-  if (rsi <= 30) return (
-    <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-400 border border-emerald-700/40">
-      <TrendingUp size={10} /> 偏多
-    </span>
-  );
-  return (
-    <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-700/50 text-slate-400 border border-slate-600/40">
-      <Minus size={10} /> 中性
-    </span>
-  );
+// 統計最常查詢的股票
+const getTopTickers = (records, n = 4) => {
+  const counts = {};
+  records.forEach(r => { counts[r.ticker] = (counts[r.ticker] || 0) + 1; });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([ticker]) => ticker);
 };
 
-const RecordCard = ({ record }) => {
-  const [expanded, setExpanded] = useState(false);
-  const { ticker, metrics, commentary, createdAt } = record;
+const parseRSS = (xmlText) => {
+  try {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlText, 'text/xml');
+    const items = xml.querySelectorAll('item');
+    return Array.from(items).slice(0, 4).map(item => {
+      const rawTitle = item.querySelector('title')?.textContent || '';
+      // Google News title often has " - 來源" suffix, strip it
+      const title = rawTitle.replace(/ - [^-]+$/, '').replace(/<[^>]*>/g, '').trim();
+      const link = item.querySelector('link')?.textContent || '';
+      const pubDate = item.querySelector('pubDate')?.textContent || '';
+      const date = pubDate ? new Date(pubDate) : null;
+      const dateStr = date && !isNaN(date)
+        ? `${date.getMonth() + 1}/${date.getDate()}`
+        : '';
+      return { title, link, dateStr };
+    }).filter(item => item.title);
+  } catch {
+    return [];
+  }
+};
 
-  const ts = createdAt?.toDate ? createdAt.toDate() : new Date(createdAt?.seconds * 1000 || Date.now());
-  const dateStr = ts.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
-  const timeStr = ts.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+const NewsCard = ({ ticker }) => {
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const companyName = getTickerShort(ticker);
+  const searchQuery = companyName !== ticker ? companyName : ticker;
 
-  const shortCommentary = commentary?.length > 60 ? commentary.substring(0, 60) + '...' : commentary;
+  useEffect(() => {
+    const url = `/gnews/?q=${encodeURIComponent(searchQuery)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`;
+    fetch(url)
+      .then(r => r.text())
+      .then(text => {
+        setNews(parseRSS(text));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [ticker]);
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-4 transition-all hover:border-slate-600">
+    <div className="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-blue-400">{getTickerShort(ticker)}</span>
-          <SignalBadge metrics={metrics} />
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Clock size={11} />
-          <span>{dateStr} {timeStr}</span>
-        </div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-sm font-semibold text-blue-400">{companyName}</span>
+        <span className="text-xs text-slate-600">{ticker}</span>
+        <Newspaper size={12} className="text-slate-600 ml-auto" />
       </div>
 
-      {/* Metrics Row */}
-      {metrics && (
-        <div className="flex gap-3 mb-3 text-xs text-slate-400">
-          {metrics.price !== undefined && (
-            <span>股價 <span className="text-slate-200 font-medium">{metrics.price}</span></span>
-          )}
-          {metrics.rsi !== undefined && (
-            <span>RSI <span className={`font-medium ${metrics.rsi >= 70 ? 'text-red-400' : metrics.rsi <= 30 ? 'text-emerald-400' : 'text-slate-200'}`}>{metrics.rsi?.toFixed(1)}</span></span>
-          )}
-          {metrics.k !== undefined && (
-            <span>K <span className="text-slate-200 font-medium">{metrics.k?.toFixed(1)}</span></span>
-          )}
-          {metrics.macd !== undefined && (
-            <span>MACD <span className={`font-medium ${metrics.macd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.macd?.toFixed(2)}</span></span>
-          )}
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin" />
+          載入新聞中...
         </div>
-      )}
-
-      {/* Commentary */}
-      {commentary && (
-        <div className="text-xs text-slate-400 leading-relaxed">
-          <p>{expanded ? commentary : shortCommentary}</p>
-          {commentary.length > 60 && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1 mt-1.5 text-blue-500 hover:text-blue-400 transition-colors"
+      ) : news.length === 0 ? (
+        <p className="text-xs text-slate-600">暫無新聞資料</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {news.map((item, i) => (
+            <a
+              key={i}
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-2 group"
             >
-              {expanded ? <><ChevronUp size={11} /> 收起</> : <><ChevronDown size={11} /> 展開全文</>}
-            </button>
-          )}
+              {item.dateStr && (
+                <span className="text-xs text-slate-600 shrink-0 mt-0.5 w-8">{item.dateStr}</span>
+              )}
+              <span className="text-xs text-slate-300 group-hover:text-blue-400 transition-colors leading-relaxed line-clamp-2 flex-1">
+                {item.title}
+              </span>
+              <ExternalLink size={10} className="shrink-0 mt-0.5 text-slate-600 group-hover:text-blue-400 transition-colors" />
+            </a>
+          ))}
         </div>
       )}
     </div>
@@ -86,24 +94,34 @@ const RecordCard = ({ record }) => {
 };
 
 const HistoryChart = ({ ticker, user }) => {
-  const [records, setRecords] = useState([]);
+  const [topTickers, setTopTickers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState('all'); // 'all' or ticker
 
   useEffect(() => {
     if (!user) return;
     setLoading(true);
-    getAnalysisHistory(user.user_id, 50).then((data) => {
-      setRecords(data);
+    getAnalysisHistory(user.user_id, 100).then((data) => {
+      const top = getTopTickers(data, 4);
+      // 如果沒有紀錄但有當前股票，顯示當前股票
+      setTopTickers(top.length > 0 ? top : (ticker ? [ticker] : []));
       setLoading(false);
     });
   }, [user]);
+
+  // 當使用者查新股票時，若尚未在列表中則加入最前面
+  useEffect(() => {
+    if (!ticker || !user) return;
+    setTopTickers(prev => {
+      if (prev.includes(ticker)) return prev;
+      return [ticker, ...prev].slice(0, 4);
+    });
+  }, [ticker]);
 
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center text-slate-600 border-2 border-dashed border-slate-800 rounded-3xl p-10 text-center min-h-[300px] gap-3">
         <LogIn size={40} className="opacity-20" />
-        <p className="text-sm">登入後可查看<br />AI 分析紀錄</p>
+        <p className="text-sm">登入後自動追蹤<br />常用股票最新消息</p>
       </div>
     );
   }
@@ -112,61 +130,29 @@ const HistoryChart = ({ ticker, user }) => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-500 gap-3">
         <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm">載入紀錄中...</p>
+        <p className="text-sm">載入中...</p>
       </div>
     );
   }
 
-  if (records.length === 0) {
+  if (topTickers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-slate-600 border-2 border-dashed border-slate-800 rounded-3xl p-10 text-center min-h-[300px]">
-        <Clock size={40} className="mb-3 opacity-20" />
-        <p className="text-sm">尚無分析紀錄<br />查詢股票後自動儲存</p>
+        <Newspaper size={40} className="mb-3 opacity-20" />
+        <p className="text-sm">查詢股票後<br />自動顯示相關新聞摘要</p>
       </div>
     );
   }
-
-  // Get unique tickers for filter
-  const tickers = [...new Set(records.map(r => r.ticker))];
-  const filtered = filter === 'all' ? records : records.filter(r => r.ticker === filter);
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-slate-400 text-sm font-medium">AI 分析紀錄</span>
-        <span className="text-xs text-slate-600">{records.length} 筆</span>
+        <span className="text-slate-400 text-sm font-medium">消息面追蹤</span>
+        <span className="text-xs text-slate-600">依查詢頻率 · 前 {topTickers.length} 檔</span>
       </div>
-
-      {/* Ticker Filter */}
-      {tickers.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              filter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            全部
-          </button>
-          {tickers.map(t => (
-            <button
-              key={t}
-              onClick={() => setFilter(t)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                filter === t ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              {getTickerShort(t)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Records */}
       <div className="flex flex-col gap-3">
-        {filtered.map(record => (
-          <RecordCard key={record.id} record={record} />
+        {topTickers.map(t => (
+          <NewsCard key={t} ticker={t} />
         ))}
       </div>
     </div>
