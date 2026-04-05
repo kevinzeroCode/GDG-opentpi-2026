@@ -5,7 +5,6 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # 使用 Docker 內部 DNS，讓 upstream 在請求時才解析（避免啟動時找不到服務）
     resolver 127.0.0.11 valid=30s ipv6=off;
 
     gzip on;
@@ -16,13 +15,15 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    # HSTS — 只在 HTTPS 環境啟用（透過 GCP Load Balancer 終止 TLS 時由 LB 處理）
+    # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     # ── CORS Origin 白名單 ────────────────────────────────────────
     map $http_origin $cors_allow_origin {
         default "";
-        "http://localhost:5173"  $http_origin;
-        "http://localhost:5174"  $http_origin;
-        "http://localhost:80"    $http_origin;
+        "http://localhost:5173"   $http_origin;
+        "http://localhost:5174"   $http_origin;
+        "${ALLOWED_ORIGIN}"       $http_origin;  # 由 envsubst 注入，如 https://dashboard.example.com
     }
 
     # SPA fallback
@@ -30,7 +31,9 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy /dify/ → api.dify.ai，API Key 由伺服器端加入，瀏覽器看不到
+    # Proxy /dify/ → api.dify.ai
+    # API Key 由伺服器端注入（${DIFY_API_KEY} 由 envsubst 在啟動時替換）
+    # 只允許白名單 origin，防止任意跨站濫用
     location /dify/ {
         if ($cors_allow_origin = "") {
             return 403;
@@ -67,7 +70,7 @@ server {
         add_header Vary Origin always;
     }
 
-    # Proxy /gnews/ → Google News RSS（解決 CORS，抓台股新聞）
+    # Proxy /gnews/ → Google News RSS
     location /gnews/ {
         proxy_pass https://news.google.com/rss/search;
         proxy_ssl_server_name on;
