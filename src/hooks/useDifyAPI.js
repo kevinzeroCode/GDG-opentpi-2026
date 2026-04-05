@@ -15,28 +15,23 @@ const useDifyAPI = () => {
     setError(null);
 
     try {
-      // 使用相對路徑，由 nginx server-side proxy 加上 Authorization header
-      // API Key 不出現在前端程式碼或瀏覽器中
-      const apiUrl = '/dify/v1/workflows/run';
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: { query: userSearch },
-          response_mode: 'blocking',
-          user: 'quant-user'
+          query: userSearch,
+          conversation_id: null,
         })
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || `Error: ${response.status}`);
+      if (!response.ok) throw new Error(data.detail || data.message || `Error: ${response.status}`);
 
-      const rawText = data.data?.outputs?.ticker || null;
-      const commentary = data.data?.outputs?.commentary || null;
-      const tickerCode = data.data?.outputs?.ticker_code || null;
+      const rawText = data.raw_text || data.ticker || null;
+      const commentary = data.commentary || null;
+      const tickerCode = data.ticker_code || null;
 
       if (!rawText && commentary) {
         setAnalysisResult({ rawText: null, metrics: null, commentary });
