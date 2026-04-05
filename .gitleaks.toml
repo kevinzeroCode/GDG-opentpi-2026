@@ -1,9 +1,5 @@
 [allowlist]
-description = "Firebase client-side config keys are intentionally public"
-regexes = [
-  "AIzaSy[A-Za-z0-9_-]{33}",
-]
-paths = [
-  ".env.production",
-  ".env.example",
+description = "Firebase client-side config keys are intentionally public (protected by Firebase Security Rules, not by key secrecy)"
+commits = [
+  "afab6899d2a4e3e0ec32b0a9edd38d4fc8d50907",
 ]
