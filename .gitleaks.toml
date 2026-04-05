@@ -1,0 +1,9 @@
+[allowlist]
+description = "Firebase client-side config keys are intentionally public"
+regexes = [
+  "AIzaSy[A-Za-z0-9_-]{33}",
+]
+paths = [
+  ".env.production",
+  ".env.example",
+]
