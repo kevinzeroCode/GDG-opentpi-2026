@@ -34,8 +34,10 @@ services:
       - redis
     restart: unless-stopped
     networks:
-      - platform_internal
-      - app_default
+      platform_internal:
+      app_default:
+        aliases:
+          - data-platform
 
 volumes:
   postgres_data:
