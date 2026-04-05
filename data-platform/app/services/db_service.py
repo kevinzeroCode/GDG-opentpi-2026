@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 import asyncpg
 from app.config import settings
 
@@ -413,3 +414,50 @@ async def get_margin_purchase(ticker: str, days: int = 60) -> list[dict]:
     except Exception:
         logger.exception("Failed to get margin purchase for %s", ticker)
         raise
+
+
+async def get_candles_from_db(ticker: str, start_date: str) -> list[dict]:
+    """從 stock_history 查詢 K 線（start_date 之後）。"""
+    pool = await get_pool()
+    rows = await pool.fetch(
+        """
+        SELECT date, open, high, low, close, volume
+        FROM stock_history
+        WHERE stock_id = $1 AND date >= $2::date
+        ORDER BY date ASC
+        """,
+        ticker, start_date,
+    )
+    return [dict(r) for r in rows]
+
+
+async def save_candles_to_db(ticker: str, candles: list[dict]) -> None:
+    """批次 upsert FinMind K 線資料到 stock_history。"""
+    if not candles:
+        return
+    pool = await get_pool()
+    records = [
+        (
+            ticker,
+            date.fromisoformat(c["date"]) if isinstance(c["date"], str) else c["date"],
+            float(c["open"]) if c.get("open") is not None else None,
+            float(c["max"]) if c.get("max") is not None else None,
+            float(c["min"]) if c.get("min") is not None else None,
+            float(c["close"]) if c.get("close") is not None else None,
+            int(c["Trading_Volume"]) if c.get("Trading_Volume") is not None else None,
+        )
+        for c in candles
+    ]
+    await pool.executemany(
+        """
+        INSERT INTO stock_history (stock_id, date, open, high, low, close, volume)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (stock_id, date) DO UPDATE SET
+            open   = EXCLUDED.open,
+            high   = EXCLUDED.high,
+            low    = EXCLUDED.low,
+            close  = EXCLUDED.close,
+            volume = EXCLUDED.volume
+        """,
+        records,
+    )

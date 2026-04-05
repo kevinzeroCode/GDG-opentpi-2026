@@ -32,11 +32,41 @@ async def get_live(ticker: str):
 
 @router.get("/{ticker}/candles")
 async def get_candles(ticker: str, start_date: str = Query(default="2020-01-01")):
-    """代理 FinMind K 線資料，保持與前端相容的原始格式。"""
+    """Cache-aside K 線：先查 DB，沒有再去 FinMind 並回存。"""
     if not _TICKER_RE.match(ticker):
         raise HTTPException(status_code=422, detail=f"無效的股票代號格式：{ticker}")
+
+    # 1. 先查 DB
     try:
-        data = await twse_service.fetch_candles(ticker, start_date)
+        rows = await db_service.get_candles_from_db(ticker, start_date)
+    except Exception:
+        rows = []
+
+    if rows:
+        data = [
+            {
+                "date": str(r["date"]),
+                "open": float(r["open"]) if r["open"] is not None else None,
+                "max": float(r["high"]) if r["high"] is not None else None,
+                "min": float(r["low"]) if r["low"] is not None else None,
+                "close": float(r["close"]) if r["close"] is not None else None,
+                "Trading_Volume": r["volume"],
+            }
+            for r in rows
+        ]
+        return {"status": 200, "data": data}
+
+    # 2. DB 沒資料，去 FinMind 抓
+    try:
+        result = await twse_service.fetch_candles(ticker, start_date)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"K 線資料取得失敗：{e}")
-    return data
+
+    # 3. 存入 DB（失敗不影響回應）
+    if result.get("data"):
+        try:
+            await db_service.save_candles_to_db(ticker, result["data"])
+        except Exception:
+            pass
+
+    return result
