@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/finmind/, ''),
         },
-        '/twse': 'http://digirunnner:18080',
+        '/twse': 'http://digirunner:18080',
       },
     },
   }
