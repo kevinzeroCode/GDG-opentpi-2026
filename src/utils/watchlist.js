@@ -1,5 +1,5 @@
 const ANON_KEY = 'quant_watchlist';
-const API_BASE = () => import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = () => import.meta.env.VITE_API_BASE_URL || '';
 
 // ── 取得目前使用者的 localStorage key ───────────────────────────
 const storageKey = () => {
