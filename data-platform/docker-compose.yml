@@ -1,0 +1,47 @@
+services:
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - data-platform
+    restart: unless-stopped
+    networks:
+      - platform_internal
+
+  redis:
+    image: redis:7-alpine
+    # 移除 ports — Redis 只在內部 network 存取，不對外暴露
+    restart: unless-stopped
+    networks:
+      - platform_internal
+
+  data-platform:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=docker-db_postgres-1
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/1
+    volumes:
+      - ./app:/app/app   # 掛載 app 目錄，修改程式碼即時生效（無需重 build）
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - platform_internal
+      - docker_default              # 加入 Dify DB 所在網路
+      - quantdashboardai_default    # 加入 DigiRunner 所在網路
+
+networks:
+  platform_internal:
+    driver: bridge
+  docker_default:
+    external: true
+  quantdashboardai_default:
+    external: true

@@ -10,6 +10,14 @@ jobs:
   frontend:
     name: Frontend Build
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'src/') ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'index.html') ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'vite.config') ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'package') ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'nginx.conf') ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), '.github/workflows/ci.yml')
 
     steps:
       - name: Checkout
@@ -41,3 +49,32 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: placeholder.appspot.com
           VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           VITE_FIREBASE_APP_ID: '1:000000000000:web:placeholder'
+
+  backend:
+    name: Backend (data-platform) Lint & Test
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'data-platform/') ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), '.github/workflows/ci.yml')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd data-platform
+          pip install -r requirements.txt
+
+      - name: Syntax check
+        run: |
+          cd data-platform
+          python -m py_compile app/main.py
+          python -m py_compile app/config.py
+          find app -name "*.py" | xargs python -m py_compile
