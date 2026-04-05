@@ -18,4 +18,4 @@ jobs:
             cd ~/app
             git pull
             docker compose build frontend
-            docker compose up -d frontend
+            docker compose up -d --force-recreate --remove-orphans frontend
