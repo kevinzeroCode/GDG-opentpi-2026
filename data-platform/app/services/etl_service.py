@@ -93,7 +93,7 @@ async def _insert_rows(pool: asyncpg.Pool, ticker: str, rows: list[dict]) -> int
 
 
 async def _get_tickers_to_sync(pool: asyncpg.Pool) -> list[str]:
-    """合併預設清單與 watchlist 中的股票代號。"""
+    """合併預設清單、watchlist、以及所有曾被查詢過的 stock_history 股票。"""
     try:
         rows = await pool.fetch("SELECT ticker FROM watchlist")
         watchlist = [r["ticker"] for r in rows]
@@ -101,7 +101,14 @@ async def _get_tickers_to_sync(pool: asyncpg.Pool) -> list[str]:
         logger.exception("Failed to fetch watchlist tickers")
         watchlist = []
 
-    combined = list(set(DEFAULT_TICKERS + watchlist))
+    try:
+        rows = await pool.fetch("SELECT DISTINCT stock_id FROM stock_history")
+        cached = [r["stock_id"] for r in rows]
+    except Exception:
+        logger.exception("Failed to fetch cached tickers")
+        cached = []
+
+    combined = list(set(DEFAULT_TICKERS + watchlist + cached))
     return combined
 
 
