@@ -260,14 +260,14 @@ workflow:
           retry_enabled: true
           retry_interval: 100
         selected: false
-        ssl_verify: false
+        ssl_verify: true
         timeout:
           max_connect_timeout: 30
           max_read_timeout: 30
           max_write_timeout: 30
         title: HTTP 請求
         type: http-request
-        url: 'http://34.80.78.207/api/stock/{{#1770907528913.ticker#}}/candles?start_date=2025-01-01'
+        url: 'https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id={{#1770907528913.ticker#}}&start_date=2025-01-01'
         variables: []
       height: 171
       id: '1770912568990'
