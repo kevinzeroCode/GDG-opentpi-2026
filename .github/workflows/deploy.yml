@@ -18,5 +18,11 @@ jobs:
             cd ~/app
             git stash
             git pull
+
+            # 前端：重建映像並重啟
             docker compose build frontend
             docker compose up -d --force-recreate --remove-orphans frontend
+
+            # 數據中台：程式碼透過 volume 掛載，直接重啟即可
+            cd ~/app/data-platform
+            docker compose restart data-platform
