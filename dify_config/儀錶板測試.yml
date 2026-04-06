@@ -252,8 +252,7 @@ workflow:
         body:
           data: []
           type: none
-        headers: 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
-          (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        headers: ''
         method: get
         params: ''
         retry_config:
@@ -261,14 +260,14 @@ workflow:
           retry_enabled: true
           retry_interval: 100
         selected: false
-        ssl_verify: true
+        ssl_verify: false
         timeout:
-          max_connect_timeout: 0
-          max_read_timeout: 0
-          max_write_timeout: 0
+          max_connect_timeout: 30
+          max_read_timeout: 30
+          max_write_timeout: 30
         title: HTTP 請求
         type: http-request
-        url: 'https://query1.finance.yahoo.com/v8/finance/chart/{{#1770907528913.ticker#}}.TW?interval=1d&range=3mo'
+        url: 'http://34.80.78.207/api/stock/{{#1770907528913.ticker#}}/candles?start_date=2025-01-01'
         variables: []
       height: 171
       id: '1770912568990'
@@ -286,26 +285,28 @@ workflow:
     - data:
         code: "import json\nimport math\n\ndef main(arg1: str, **kwargs):\n    raw_input\
           \ = arg1 if arg1 else list(kwargs.values())[0]\n    \n    try:\n        data\
-          \ = json.loads(str(raw_input))\n        res = data['chart']['result'][0]\n\
-          \        indicators = res['indicators']['quote'][0]\n        prices = [p\
-          \ for p in indicators['close'] if p is not None]\n        highs = [h for\
-          \ h in indicators['high'] if h is not None]\n        lows = [l for l in\
-          \ indicators['low'] if l is not None]\n        \n        if len(prices) <\
-          \ 26:\n            return {\"result\": \"數據不足 26 筆\"}\n\n        # --- MA\
-          \ ---\n        ma5 = sum(prices[-5:]) / 5\n        ma20 = sum(prices[-20:])\
-          \ / 20\n        \n        # --- RSI ---\n        deltas = [prices[i] - prices[i-1]\
-          \ for i in range(1, len(prices))]\n        gains = [d if d > 0 else 0 for\
-          \ d in deltas[-14:]]\n        losses = [-d if d < 0 else 0 for d in deltas[-14:]]\n\
-          \        rsi = 100 - (100 / (1 + (sum(gains)/14 + 1e-9) / (sum(losses)/14\
-          \ + 1e-9)))\n\n        # --- KD ---\n        lowest_low = min(lows[-9:])\n\
-          \        highest_high = max(highs[-9:])\n        k_value = (prices[-1] -\
-          \ lowest_low) / (highest_high - lowest_low + 1e-9) * 100\n        k_values\
-          \ = []\n        for i in range(3):\n            idx = -(i + 1)\n         \
-          \   ll = min(lows[-9+idx:len(lows)+idx]) if len(lows)+idx >= 9 else min(lows[:len(lows)+idx])\n\
-          \            hh = max(highs[-9+idx:len(highs)+idx]) if len(highs)+idx >=\
-          \ 9 else max(highs[:len(highs)+idx])\n            k_val = (prices[idx-1]\
-          \ - ll) / (hh - ll + 1e-9) * 100\n            k_values.append(k_val)\n \
-          \       d_value = sum(k_values) / 3\n\n        # --- MACD ---\n        def\
+          \ = json.loads(str(raw_input))\n        # 數據中台格式：{\"status\": 200, \"data\"\
+          : [{\"date\":..., \"open\":..., \"max\":..., \"min\":..., \"close\":..., \"\
+          Trading_Volume\":...}]}\n        candles = data.get('data', [])\n        if\
+          \ not candles:\n            return {\"result\": \"數據不足 26 筆\"}\n        prices\
+          \ = [c['close'] for c in candles if c.get('close') is not None]\n        highs\
+          \ = [c['max'] for c in candles if c.get('max') is not None]\n        lows\
+          \ = [c['min'] for c in candles if c.get('min') is not None]\n        \n  \
+          \      if len(prices) < 26:\n            return {\"result\": \"數據不足 26 筆\"\
+          }\n\n        # --- MA ---\n        ma5 = sum(prices[-5:]) / 5\n        ma20\
+          \ = sum(prices[-20:]) / 20\n        \n        # --- RSI ---\n        deltas\
+          \ = [prices[i] - prices[i-1] for i in range(1, len(prices))]\n        gains\
+          \ = [d if d > 0 else 0 for d in deltas[-14:]]\n        losses = [-d if d\
+          \ < 0 else 0 for d in deltas[-14:]]\n        rsi = 100 - (100 / (1 + (sum(gains)/14\
+          \ + 1e-9) / (sum(losses)/14 + 1e-9)))\n\n        # --- KD ---\n        lowest_low\
+          \ = min(lows[-9:])\n        highest_high = max(highs[-9:])\n        k_value\
+          \ = (prices[-1] - lowest_low) / (highest_high - lowest_low + 1e-9) * 100\n\
+          \        k_values = []\n        for i in range(3):\n            idx = -(i\
+          \ + 1)\n            ll = min(lows[-9+idx:len(lows)+idx]) if len(lows)+idx\
+          \ >= 9 else min(lows[:len(lows)+idx])\n            hh = max(highs[-9+idx:len(highs)+idx])\
+          \ if len(highs)+idx >= 9 else max(highs[:len(highs)+idx])\n            k_val\
+          \ = (prices[idx-1] - ll) / (hh - ll + 1e-9) * 100\n            k_values.append(k_val)\n\
+          \        d_value = sum(k_values) / 3\n\n        # --- MACD ---\n        def\
           \ ema(data, period):\n            multiplier = 2 / (period + 1)\n         \
           \   result = [data[0]]\n            for price in data[1:]:\n             \
           \   result.append((price - result[-1]) * multiplier + result[-1])\n      \
