@@ -80,7 +80,8 @@ async def get_live_or_last(ticker: str):
     try:
         data = await twse_service.fetch_live(ticker)
         vol = data.get("volume") or 0
-        if vol >= 100:
+        # 只有當日真實有成交（open 有值）才算即時；否則 TWSE 回傳昨日量但今日無開盤
+        if vol >= 100 and data.get("open") is not None:
             return StockLiveResponse(ticker=ticker, **data)
     except Exception:
         pass
