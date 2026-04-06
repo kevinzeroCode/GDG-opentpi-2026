@@ -16,6 +16,7 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           script: |
             cd ~/app
+            git stash
             git pull
             docker compose build frontend
             docker compose up -d --force-recreate --remove-orphans frontend
