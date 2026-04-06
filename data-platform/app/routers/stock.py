@@ -70,3 +70,41 @@ async def get_candles(ticker: str, start_date: str = Query(default="2020-01-01")
             pass
 
     return result
+
+
+@router.get("/{ticker}/live-or-last")
+async def get_live_or_last(ticker: str):
+    """即時資料；若今日休市（成交量 < 100）則回傳 DB 最後交易日。"""
+    if not _TICKER_RE.match(ticker):
+        raise HTTPException(status_code=422, detail=f"無效的股票代號格式：{ticker}")
+    try:
+        data = await twse_service.fetch_live(ticker)
+        vol = data.get("volume") or 0
+        if vol >= 100:
+            return StockLiveResponse(ticker=ticker, **data)
+    except Exception:
+        pass
+
+    # Fallback：取 DB 最後一個交易日
+    pool = await db_service.get_pool()
+    row = await pool.fetchrow(
+        "SELECT date, open, high, low, close, volume FROM stock_history WHERE stock_id=$1 ORDER BY date DESC LIMIT 1",
+        ticker,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail=f"找不到 {ticker} 資料")
+    r = dict(row)
+    return {
+        "ticker": ticker,
+        "name": ticker,
+        "open": float(r["open"]) if r["open"] else None,
+        "high": float(r["high"]) if r["high"] else None,
+        "low": float(r["low"]) if r["low"] else None,
+        "last": float(r["close"]) if r["close"] else None,
+        "prev_close": float(r["close"]) if r["close"] else None,
+        "volume": r["volume"],
+        "time": "13:30:00",
+        "date": str(r["date"]).replace("-", ""),
+        "cached": False,
+        "source": "db",
+    }
