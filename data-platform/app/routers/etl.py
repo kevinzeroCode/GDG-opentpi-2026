@@ -31,6 +31,16 @@ async def get_status():
     return await get_last_run_status()
 
 
+@router.get("/tickers")
+async def get_tracked_tickers():
+    """查詢下次 ETL 會同步的所有股票（預設 + watchlist + 曾查詢過的）。"""
+    from app.services.db_service import get_pool
+    from app.services.etl_service import _get_tickers_to_sync
+    pool = await get_pool()
+    tickers = await _get_tickers_to_sync(pool)
+    return {"count": len(tickers), "tickers": sorted(tickers)}
+
+
 @router.post("/sync/financial")
 async def trigger_financial_sync(background_tasks: BackgroundTasks):
     """手動觸發財務 ETL（月營收 + 季報，背景執行）。"""
