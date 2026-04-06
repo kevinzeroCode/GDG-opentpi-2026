@@ -116,6 +116,9 @@ function App() {
       const commentary = analysisResult.commentary
         || generateCommentary(lastTicker, analysisResult.metrics)
         || analysisResult.rawText;
+      if (lastTicker) {
+        setMessages(prev => [...prev, { role: 'system', content: `已識別股票：${lastTicker}` }]);
+      }
       setMessages(prev => [...prev, { role: 'bot', content: commentary }]);
       // 登入狀態下，把分析紀錄（含 AI commentary）存進 Firestore
       if (user && lastTicker) {
@@ -387,6 +390,13 @@ function App() {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.map((msg, idx) => (
+            msg.role === 'system' ? (
+              <div key={idx} className="flex justify-center">
+                <span className="text-xs text-slate-500 bg-slate-800/70 border border-slate-700 px-3 py-1 rounded-full font-mono">
+                  {msg.content}
+                </span>
+              </div>
+            ) : (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[80%] flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${msg.role === 'user' ? 'bg-slate-700' : 'bg-blue-900/50'}`}>
@@ -397,6 +407,7 @@ function App() {
                 </div>
               </div>
             </div>
+            )
           ))}
           {loading && (
             <div className="flex justify-start">
