@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchTWSELive } from '../utils/twseLive';
+import { cacheTickerName } from '../utils/tickerNames';
 
 const useTWSELive = (ticker) => {
   const [data, setData] = useState(null);
@@ -11,7 +12,7 @@ const useTWSELive = (ticker) => {
 
     const load = () =>
       fetchTWSELive(ticker)
-        .then((d) => { setData(d); setError(null); })
+        .then((d) => { setData(d); setError(null); cacheTickerName(ticker, d?.name); })
         .catch((e) => setError(e.message));
 
     load();

@@ -34,8 +34,11 @@ const useDifyAPI = () => {
       const tickerCode = data.ticker_code || null;
 
       if (!rawText && commentary) {
+        const resolvedTicker = (tickerCode && /^\d{4,6}$/.test(tickerCode.trim()))
+          ? tickerCode.trim()
+          : userSearch.match(/\d{4,}/)?.[0] || null;
         setAnalysisResult({ rawText: null, metrics: null, commentary });
-        setLastTicker(null);
+        setLastTicker(resolvedTicker);
         return;
       }
 

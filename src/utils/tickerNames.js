@@ -87,6 +87,9 @@ const NAMES = {
   '2609': '陽明',
   '2615': '萬海',
 
+  // AI／軟體服務
+  '7781': '昕力資訊',
+
   // 其他熱門
   '3037': '欣興',
   '2345': '智邦',
@@ -109,13 +112,22 @@ const REVERSE_NAMES = Object.fromEntries(
   Object.entries(NAMES).map(([code, name]) => [name, code])
 );
 
+// 動態 cache：從 API 回傳的公司名稱
+const NAME_CACHE = {};
+
+export const cacheTickerName = (ticker, name) => {
+  if (ticker && name && name !== ticker) {
+    NAME_CACHE[ticker] = name;
+  }
+};
+
 export const getTickerLabel = (ticker) => {
-  const name = NAMES[ticker];
+  const name = NAMES[ticker] || NAME_CACHE[ticker];
   return name ? `${ticker} ${name}` : ticker;
 };
 
 export const getTickerShort = (ticker) => {
-  return NAMES[ticker] || ticker;
+  return NAMES[ticker] || NAME_CACHE[ticker] || ticker;
 };
 
 // 將輸入（數字代號或中文名）解析為代號
