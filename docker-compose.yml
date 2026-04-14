@@ -2,15 +2,34 @@ version: '3.8'
 services:
   frontend:
     build: .
-    ports:
-      - "80:80"
+    expose:
+      - "5173"
     env_file:
       - .env.server
     depends_on:
-      - digirunnner
+      - digirunner
     restart: unless-stopped
 
-  digirunnner:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+
+  digirunner:
     image: tpisoftwareopensource/digirunner-open-source
     ports:
       - "31080:18080"
@@ -26,3 +45,5 @@ services:
 volumes:
   digirunner_data:
   digirunner_keys:
+  certbot_www:
+  certbot_conf:
