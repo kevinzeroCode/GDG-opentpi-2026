@@ -7,7 +7,6 @@ import GaugeChart from './components/Dashboard/GaugeChart';
 import KDChart from './components/Dashboard/KDChart';
 import MACDChart from './components/Dashboard/MACDChart';
 import HistoryChart from './components/Dashboard/HistoryChart';
-import PriceChart from './components/Dashboard/PriceChart';
 import CandlestickChart from './components/Dashboard/CandlestickChart';
 import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2, LogIn, LogOut, Shield } from 'lucide-react';
 import Chart from 'react-apexcharts';
@@ -598,9 +597,6 @@ function App() {
                   </div>
                 </div>
               </div>
-
-              {/* Price Chart */}
-              <PriceChart ticker={lastTicker} />
 
               {/* Candlestick Chart */}
               <CandlestickChart ticker={lastTicker} liveData={liveData} />
