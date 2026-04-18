@@ -22,6 +22,7 @@ import { generateCommentary } from './utils/commentary';
 function App() {
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  const [mobileView, setMobileView] = useState('chat'); // 'chat' | 'dashboard'
   const [messages, setMessages] = useState([
     { role: 'bot', content: '您好！我是您的量化分析助手。請輸入台股代碼（如：2330），我將為您解析即時數據。' }
   ]);
@@ -265,7 +266,7 @@ function App() {
     <div className="flex flex-col md:flex-row h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
 
       {/* Left: Chat Area */}
-      <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-800 min-h-0">
+      <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} md:flex flex-1 flex-col border-b md:border-b-0 md:border-r border-slate-800 min-h-0 pb-14 md:pb-0`}>
         <header className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
             <Bot size={24} className="text-white" />
@@ -281,7 +282,7 @@ function App() {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 bg-emerald-900/40 border border-emerald-700/50 rounded-lg px-2.5 py-1 text-xs text-emerald-400">
                 <Shield size={12} />
-                <span>{user?.username}</span>
+                <span className="max-w-[80px] truncate">{user?.username}</span>
               </div>
               <button onClick={handleLogout} title="登出"
                 className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
@@ -456,7 +457,7 @@ function App() {
       </div>
 
       {/* Right: Dashboard Panel */}
-      <div className="w-full md:w-[400px] bg-slate-900/50 flex flex-col overflow-hidden min-h-[40vh] md:min-h-0">
+      <div className={`${mobileView === 'dashboard' ? 'flex' : 'hidden'} md:flex w-full md:w-[400px] bg-slate-900/50 flex-col overflow-hidden pb-14 md:pb-0`}>
         {/* Tab Header */}
         <div className="p-4 pb-0">
           <div className="flex items-center justify-between mb-2">
@@ -503,7 +504,8 @@ function App() {
                     : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
                 }`}
               >
-                {tab.icon} {tab.label}
+                {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -617,6 +619,24 @@ function App() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 flex border-t border-slate-800 bg-slate-900 z-40">
+        <button
+          onClick={() => setMobileView('chat')}
+          className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 text-xs transition-colors ${mobileView === 'chat' ? 'text-blue-400' : 'text-slate-500'}`}
+        >
+          <Bot size={20} />
+          <span>分析</span>
+        </button>
+        <button
+          onClick={() => setMobileView('dashboard')}
+          className={`flex-1 flex flex-col items-center justify-center py-3 gap-1 text-xs transition-colors ${mobileView === 'dashboard' ? 'text-blue-400' : 'text-slate-500'}`}
+        >
+          <BarChart3 size={20} />
+          <span>儀表板</span>
+        </button>
       </div>
     </div>
   );
