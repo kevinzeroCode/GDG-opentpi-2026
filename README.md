@@ -9,46 +9,55 @@
 > 基於 **React + Vite** 前端、**FastAPI** 數據中台、**Dify.ai Cloud** AI 引擎的全端台股量化分析平台。
 > 支援使用者系統、AI 多輪對話、即時技術指標分析、K 線 cache-aside、每日自動 ETL。
 
-**線上展示：** http://34.80.78.207
+**線上展示：** https://quant-opentpi.duckdns.org
 
 ---
 
 ## 系統架構
 
 ```mermaid
-graph TB
-    subgraph Client["瀏覽器"]
-        FE["React + Vite<br/>QuantDashboard AI"]
-    end
+flowchart TD
+    User["🖥️ User Browser\nReact SPA"]
+    DNS["🌐 DuckDNS\nquant-opentpi.duckdns.org"]
 
-    subgraph GCP["GCP VM — 34.80.78.207"]
-        NGX["nginx :80<br/>前端靜態檔 + API 反向代理"]
-
-        subgraph Platform["數據中台 :8000"]
-            API["FastAPI / data-platform<br/>認證、AI 轉發、ETL 排程"]
-            PG[("PostgreSQL<br/>stock_history / watchlist<br/>etl_runs / app_users")]
-            RD[("Redis<br/>行情快取 30s TTL")]
-            ETL["APScheduler<br/>股價 18:05<br/>籌碼 18:30<br/>財務每月 1 日"]
+    subgraph GCP["☁️ GCP Compute Engine · asia-east1-b · 104.199.213.119"]
+        subgraph APP["Docker Compose: app"]
+            NGINX["nginx\nPort 443 SSL · Port 80 → redirect HTTPS"]
+            CERTBOT["certbot\nSSL Auto-Renewal"]
+            FRONTEND["frontend nginx · Port 80\nReact Static Files + API Proxy"]
+            DIGI["DigiRunner · Port 31080\nTWSE & FinMind API Proxy"]
         end
 
-        DGR["DigiRunner :18080<br/>API Gateway（保留）"]
+        subgraph DP["Docker Compose: data-platform"]
+            FASTAPI["FastAPI · Port 8000\nStock API · AI Endpoint · JWT Auth · ETL"]
+            PG[("PostgreSQL 16\nK-line History · User Accounts")]
+            REDIS[("Redis 7\nReal-time Price Cache")]
+            SCHED["APScheduler\nDaily ETL 18:05"]
+        end
     end
 
-    subgraph External["外部服務"]
-        DIFY["Dify Cloud<br/>AI Workflow<br/>股票分析助手"]
-        TWSE["TWSE 即時行情 API"]
-        FM["FinMind<br/>歷史 K 線 / 財務 / 籌碼"]
+    subgraph EXT["External Services"]
+        DIFY["Dify Cloud\nWorkflow + GPT-5\nRSI / KD / MACD Analysis"]
+        FINMIND["FinMind API\nTaiwan Stock Historical Data"]
+        TWSE["TWSE\nReal-time Stock Price"]
+        LE["Let's Encrypt\nSSL Certificate"]
     end
 
-    FE -- "HTTP" --> NGX
-    NGX -- "/api/ proxy" --> API
-    NGX -- "/twse/ proxy" --> DGR
-
-    API --> DIFY
-    API --> TWSE
-    API --- PG
-    API --- RD
-    ETL --> FM
+    User -->|"HTTPS :443"| NGINX
+    User -. "DNS lookup" .-> DNS
+    NGINX -->|"proxy :80"| FRONTEND
+    CERTBOT -. "Renew cert" .-> LE
+    FRONTEND -->|"/api/"| FASTAPI
+    FRONTEND -->|"/twse/ /finmind/"| DIGI
+    FRONTEND -. "/dify/ proxy" .-> DIFY
+    FASTAPI -->|"Workflow API"| DIFY
+    DIFY -. "Callback: GET /candles" .-> FASTAPI
+    FASTAPI --- PG
+    FASTAPI --- REDIS
+    DIGI -->|"Real-time price"| TWSE
+    DIGI -->|"Historical data"| FINMIND
+    SCHED -->|"Daily ETL"| FINMIND
+    SCHED --> PG
 ```
 
 ### 元件說明
@@ -243,8 +252,9 @@ GDG-opentpi-2026/
 - [x] GCP VM 部署（Docker + GitHub Actions CI/CD）
 - [x] 自動 deploy（push to main 同步前端 + data-platform）
 
-### 🔲 Phase 4 — 待辦
-- [ ] HTTPS + 自訂網域（Let's Encrypt / Cloudflare）
+### ✅ Phase 4 — 雲端強化
+- [x] HTTPS + 自訂網域（Let's Encrypt + DuckDNS + nginx SSL）
+- [x] GCP 靜態 IP（104.199.213.119）
 - [ ] Firebase Auth 整合（Google 登入）
 - [ ] 監控 & 告警（Uptime Robot / GCP Monitoring）
 
