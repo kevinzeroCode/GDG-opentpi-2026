@@ -12,12 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'pull_request' ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'src/') ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'index.html') ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'vite.config') ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'package') ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'nginx.conf') ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), '.github/workflows/ci.yml')
+      contains(toJson(github.event.commits.*.modified), 'src/') ||
+      contains(toJson(github.event.commits.*.added), 'src/') ||
+      contains(toJson(github.event.commits.*.modified), 'index.html') ||
+      contains(toJson(github.event.commits.*.added), 'index.html') ||
+      contains(toJson(github.event.commits.*.modified), 'vite.config') ||
+      contains(toJson(github.event.commits.*.modified), 'package') ||
+      contains(toJson(github.event.commits.*.added), 'package') ||
+      contains(toJson(github.event.commits.*.modified), 'nginx.conf') ||
+      contains(toJson(github.event.commits.*.modified), '.github/workflows/ci.yml')
 
     steps:
       - name: Checkout
@@ -55,8 +58,9 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'pull_request' ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), 'data-platform/') ||
-      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), '.github/workflows/ci.yml')
+      contains(toJson(github.event.commits.*.modified), 'data-platform/') ||
+      contains(toJson(github.event.commits.*.added), 'data-platform/') ||
+      contains(toJson(github.event.commits.*.modified), '.github/workflows/ci.yml')
 
     steps:
       - name: Checkout
