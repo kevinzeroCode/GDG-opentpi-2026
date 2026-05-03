@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # FinMind 直連
     finmind_url: str = "https://api.finmindtrade.com/api/v4/data"
+    finmind_token: str = ""  # 選填：finmindtrade.com 免費帳號 token，提高 API 限額
 
     cors_origins: str = "http://localhost:5173,http://localhost:5174"
 

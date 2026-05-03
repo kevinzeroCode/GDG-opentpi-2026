@@ -1,0 +1,158 @@
+ 啟動指南                                                                                                              
+                                                                                                                        
+  前置需求                                                                                                              
+                                                                                                                        
+  - Docker Desktop（已安裝並執行）                                                                                      
+  - Node.js 20+（只有本地 dev 模式才需要）                                                                              
+                                                                                                                        
+  ---                                                                                                                   
+  一、需要哪些 Key                                                                                                      
+                                                                                                                        
+  必填（缺少會無法啟動）                                                                                              
+
+  ┌──────────────┬───────────────────────┬────────────────────────────────────────────────────────────────────┐         
+  │     Key      │         用途          │                              哪裡取得                              │
+  ├──────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤         
+  │ DIFY_API_KEY │ AI 股票分析引擎       │ https://cloud.dify.ai → 建立 Workflow 應用 → API Access → 複製 Key │       
+  ├──────────────┼───────────────────────┼────────────────────────────────────────────────────────────────────┤
+  │ JWT_SECRET   │ 使用者登入 Token 簽名 │ 自己產生：openssl rand -hex 32                                     │         
+  └──────────────┴───────────────────────┴────────────────────────────────────────────────────────────────────┘         
+                                                                                                                        
+  選填（功能降級但系統可跑）                                                                                            
+                                                                                                                      
+  ┌─────────────────────┬───────────────────────────────────────────────────────────────────────┐                       
+  │         Key         │                              缺少的影響                               │                     
+  ├─────────────────────┼───────────────────────────────────────────────────────────────────────┤                       
+  │ Firebase 6 個 Key   │ 無跨裝置自選股同步、無 Firestore 查詢紀錄（本機 localStorage 仍正常） │                     
+  ├─────────────────────┼───────────────────────────────────────────────────────────────────────┤
+  │ EmailJS 3 個 Key    │ 警報不發 Email，其餘功能正常                                          │                       
+  ├─────────────────────┼───────────────────────────────────────────────────────────────────────┤                       
+  │ DIGIRUNNER_PASSWORD │ TWSE 代理走備用路徑，影響不大                                         │                       
+  └─────────────────────┴───────────────────────────────────────────────────────────────────────┘                       
+                                                                                                                      
+  ---                                                                                                                   
+  二、建立設定檔                                                                                                      
+                
+  檔案 1：data-platform/.env（後端，必建）
+                                                                                                                        
+  cd GDG-opentpi-2026/data-platform
+  cp .env.example .env                                                                                                  
+                                                                                                                      
+  打開 data-platform/.env，最少填這兩行：                                                                               
+                                                                                                                      
+  # DB / Redis 使用 docker-compose 預設值，不用改                                                                       
+  DB_HOST=postgres                                                                                                      
+  DB_PORT=5432
+  DB_NAME=stockdb                                                                                                       
+  DB_USER=postgres                                                                                                    
+  DB_PASSWORD=stockdb1234                                                                                               
+  REDIS_URL=redis://redis:6379/1
+                                                                                                                        
+  # ★ 必填：Dify Cloud API Key                                                                                        
+  DIFY_API_KEY=app-你的key貼這裡
+                                                                                                                        
+  # ★ 必填：JWT Secret（至少 32 字元隨機字串）
+  JWT_SECRET=執行 openssl rand -hex 32 的輸出貼這裡                                                                     
+                                                                                                                        
+  # 本地開發用
+  CORS_ORIGINS=http://localhost:5173,http://localhost:80                                                                
+                                                                                                                        
+  ---
+  檔案 2：根目錄 .env.server（前端 Docker nginx，必建）                                                                 
+                                                                                                                        
+  根目錄沒有這個檔案，手動建立：
+                                                                                                                        
+  cd GDG-opentpi-2026                                                                                                 
+  touch .env.server                                                                                                     
+  
+  內容：                                                                                                                
+                                                                                                                      
+  # nginx template 用（伺服器端注入，瀏覽器看不到）
+  DIFY_API_KEY=app-你的key貼這裡                                                                                        
+  
+  ---                                                                                                                   
+  檔案 3：根目錄 .env（只有 npm run dev 本地開發才需要）                                                              
+                                                                                                                        
+  cp .env.example .env
+                                                                                                                        
+  打開根目錄 .env，填入：                                                                                             
+
+  VITE_DIFY_API_URL=https://api.dify.ai/v1                                                                              
+  VITE_DIFY_API_KEY=app-你的key貼這裡
+                                                                                                                        
+  ▎ Firebase 和 EmailJS 的值已在 .env.production 裡，npm run build / Docker 時自動使用，本地 dev 如需要再填 .env。      
+  
+  ---                                                                                                                   
+  三、啟動步驟                                                                                                        
+              
+  模式 A：全 Docker（推薦，最接近生產環境）
+                                                                                                                        
+  # 1. 建立共用 Docker 網路（只需執行一次）
+  docker network create app_default                                                                                     
+                                                                                                                      
+  # 2. 啟動後端（PostgreSQL + Redis + FastAPI）                                                                         
+  cd data-platform                                                                                                    
+  docker compose up -d                                                                                                  
+                                                                                                                      
+  # 3. 啟動前端（React build + nginx at port 80）                                                                       
+  cd ..
+  docker compose up -d                                                                                                  
+                                                                                                                      
+  # 4. 開啟瀏覽器
+  # http://localhost:80
+
+  模式 B：本地 dev（前端熱更新）                                                                                        
+  
+  # 1. 啟動後端                                                                                                         
+  cd data-platform                                                                                                    
+  docker compose up -d
+
+  # 2. 安裝前端相依套件（第一次）                                                                                       
+  cd ..
+  npm install                                                                                                           
+                                                                                                                      
+  # 3. 啟動 Vite dev server
+  npm run dev
+                                                                                                                        
+  # 4. 開啟瀏覽器
+  # http://localhost:5173                                                                                               
+                                                                                                                      
+  ▎ 注意：模式 B 的 /api/ 呼叫需要在 vite.config.js 加一條 proxy：                                                      
+  ▎ '/api': { target: 'http://localhost:8000', changeOrigin: true }
+  ▎ 加在 proxy: { ... } 物件裡即可。                                                                                    
+                                                                                                                        
+  ---
+  四、Dify Workflow 設定（AI 分析核心）                                                                                 
+                                                                                                                        
+  Dify Key 拿到後，還需要匯入 Workflow 設定：
+                                                                                                                        
+  1. 登入 https://cloud.dify.ai                                                                                         
+  2. 左上角 → 匯入 DSL                                                                                                  
+  3. 選擇專案內的 dify_config/儀錶板測試.yml                                                                            
+  4. 匯入後，進入該 Workflow → API Access → 複製 Key                                                                    
+  5. 這個 Key 就是填入 DIFY_API_KEY 的值                                                                                
+                                                                                                                        
+  ---                                                                                                                   
+  五、確認服務正常                                                                                                      
+                                                                                                                      
+  # 後端健康檢查
+  curl http://localhost:8000/health
+  # 應回傳：{"status":"ok","service":"QuantDashboard 數據中台"}                                                         
+                                                                                                                        
+  # 確認資料庫 table 建立                                                                                               
+  docker logs data-platform-data-platform-1 2>&1 | grep "✅"                                                            
+  # 應看到：✅ 數據中台啟動成功（DB 已連線）                                                                            
+                                                                                                                        
+  ---                                                                                                                   
+  整體流程圖                                                                                                            
+                                                                                                                      
+  cloud.dify.ai
+      ↓ 取得 DIFY_API_KEY
+  data-platform/.env  ←── 填入 DIFY_API_KEY + JWT_SECRET                                                                
+  .env.server         ←── 填入 DIFY_API_KEY（nginx 用）                                                                 
+      ↓                                                                                                                 
+  docker network create app_default                                                                                     
+  docker compose up -d   （data-platform/）                                                                             
+  docker compose up -d   （根目錄/）                                                                                    
+      ↓
+  http://localhost:80  ✅  

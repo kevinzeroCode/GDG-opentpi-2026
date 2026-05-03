@@ -36,11 +36,12 @@ async def _get_last_chips_date(pool: asyncpg.Pool, ticker: str, table: str) -> s
 
 
 async def _fetch_finmind(dataset: str, ticker: str, start_date: str) -> list[dict]:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            FINMIND_URL,
-            params={"dataset": dataset, "data_id": ticker, "start_date": start_date},
-        )
+    from app.config import settings
+    params: dict = {"dataset": dataset, "data_id": ticker, "start_date": start_date}
+    if settings.finmind_token:
+        params["token"] = settings.finmind_token
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.get(FINMIND_URL, params=params)
         resp.raise_for_status()
         data = resp.json()
     if data.get("status") != 200:
@@ -191,3 +192,14 @@ async def run_chips_etl(manual: bool = False) -> dict:
 
 async def get_last_run_status() -> dict:
     return _last_run
+
+
+async def fetch_and_save_institutional_on_demand(ticker: str, days: int = 60) -> None:
+    """單支股票的即時補抓：直接向 FinMind 抓取後 upsert 到 DB。
+    用於 Router cache-aside：DB 無資料時呼叫此函數，之後再從 DB 讀取。
+    """
+    start_date = (datetime.now(timezone.utc) - timedelta(days=days + 5)).strftime("%Y-%m-%d")
+    rows = await _fetch_finmind("TaiwanStockInstitutionalInvestorsBuySell", ticker, start_date)
+    if rows:
+        pool = await get_pool()
+        await _insert_institutional_rows(pool, rows)
