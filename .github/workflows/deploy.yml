@@ -23,6 +23,9 @@ jobs:
             docker compose build frontend
             docker compose up -d --force-recreate --remove-orphans frontend
 
+            # Nginx：若未運行則啟動（已在跑則不重建，避免中斷 HTTPS 連線）
+            docker compose up -d --no-recreate nginx
+
             # 數據中台：程式碼透過 volume 掛載，直接重啟即可
             cd ~/app/data-platform
             docker compose restart data-platform
