@@ -17,7 +17,10 @@ async def get_institutional(
     """
     ticker_upper = ticker.upper()
     rows = await db_service.get_institutional_investors(ticker_upper, days)
-    if not rows:
+
+    # 觸發補抓：DB 無資料，或資料全為 buy=0（第一次抓取時欄位名稱錯誤的髒資料）
+    needs_refresh = not rows or max((r["buy"] for r in rows), default=0) == 0
+    if needs_refresh:
         try:
             from app.services.chips_service import fetch_and_save_institutional_on_demand
             await fetch_and_save_institutional_on_demand(ticker_upper, days)

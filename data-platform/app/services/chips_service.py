@@ -66,7 +66,9 @@ async def _insert_institutional_rows(pool: asyncpg.Pool, rows: list[dict]) -> in
         """
         INSERT INTO stock_institutional_investors (stock_id, date, name, buy, sell)
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (stock_id, date, name) DO NOTHING
+        ON CONFLICT (stock_id, date, name) DO UPDATE SET
+            buy  = EXCLUDED.buy,
+            sell = EXCLUDED.sell
         """,
         values,
     )
