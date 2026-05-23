@@ -57,8 +57,8 @@ async def _insert_institutional_rows(pool: asyncpg.Pool, rows: list[dict]) -> in
             row["stock_id"],
             datetime.strptime(row["date"], "%Y-%m-%d").date(),
             str(row["name"]),
-            int(row.get("buy", 0)),
-            int(row.get("sell", 0)),
+            int(row.get("buy", 0)) // 1000,   # FinMind 單位為股，除 1000 轉換為張
+            int(row.get("sell", 0)) // 1000,
         )
         for row in rows
     ]

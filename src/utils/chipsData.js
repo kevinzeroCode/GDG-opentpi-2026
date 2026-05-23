@@ -7,9 +7,12 @@ export async function fetchInstitutional(ticker, days = 40) {
   return res.json();
 }
 
+// FinMind 回傳英文名稱（Foreign_Investor, Foreign_Dealer_Self, Investment_Trust 等）
+const isForeign = (name) => name.includes('外資') || name.startsWith('Foreign');
+const isTrust   = (name) => name.includes('投信') || name === 'Investment_Trust';
+
 /**
  * 將 API 原始資料整理成 [{ date, foreign, trust }, ...] 依日期升序。
- * 外資 = 所有 name 含「外資」的加總；投信 = name === 「投信」。
  * 單位：張（正 = 買超，負 = 賣超）。
  */
 export function processInstitutional(rawData) {
@@ -17,9 +20,9 @@ export function processInstitutional(rawData) {
   for (const row of rawData.data) {
     const d = String(row.date);
     if (!byDate[d]) byDate[d] = { date: d, foreign: 0, trust: 0 };
-    if (row.name.includes('外資')) {
+    if (isForeign(row.name)) {
       byDate[d].foreign += row.net;
-    } else if (row.name.includes('投信')) {
+    } else if (isTrust(row.name)) {
       byDate[d].trust += row.net;
     }
   }
