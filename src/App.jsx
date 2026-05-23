@@ -8,7 +8,8 @@ import KDChart from './components/Dashboard/KDChart';
 import MACDChart from './components/Dashboard/MACDChart';
 import HistoryChart from './components/Dashboard/HistoryChart';
 import CandlestickChart from './components/Dashboard/CandlestickChart';
-import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2, LogIn, LogOut, Shield } from 'lucide-react';
+import ChipsChart from './components/Dashboard/ChipsChart';
+import { Send, Bot, User, TrendingUp, BarChart3, Activity, Clock, Loader2, RefreshCw, Download, Star, X, Bell, Plus, Trash2, LogIn, LogOut, Shield, Users } from 'lucide-react';
 import Chart from 'react-apexcharts';
 import { getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, updateShares, updateAvgCost, syncWatchlistFromPlatform } from './utils/watchlist';
 import { saveAnalysis, addWatchlistItem, removeWatchlistItem, getWatchlistFromFirestore } from './utils/firestore';
@@ -256,10 +257,11 @@ function App() {
   };
 
   const tabs = [
-    { label: '總覽', icon: <BarChart3 size={14} /> },
+    { label: '總覽',   icon: <BarChart3 size={14} /> },
     { label: '技術指標', icon: <Activity size={14} /> },
-    { label: '分析紀錄', icon: <Clock size={14} /> },
-    { label: '自選', icon: <Star size={14} /> },
+    { label: '籌碼',   icon: <Users size={14} /> },
+    { label: '紀錄',   icon: <Clock size={14} /> },
+    { label: '自選',   icon: <Star size={14} /> },
   ];
 
   return (
@@ -513,7 +515,7 @@ function App() {
 
         {/* Tab Content */}
         <div ref={dashboardRef} className="flex-1 overflow-y-auto p-4 pt-4">
-          {activeTab === 3 ? (
+          {activeTab === 4 ? (
             <WatchlistTab
               watchlist={watchlist}
               loading={loading}
@@ -523,8 +525,10 @@ function App() {
               onSharesChange={(ticker, shares) => { updateShares(ticker, shares); watchlistTick((n) => n + 1); }}
               onAvgCostChange={(ticker, cost) => { updateAvgCost(ticker, cost); watchlistTick((n) => n + 1); }}
             />
-          ) : activeTab === 2 ? (
+          ) : activeTab === 3 ? (
             <HistoryChart ticker={lastTicker} user={user} />
+          ) : activeTab === 2 ? (
+            <ChipsChart ticker={lastTicker} />
           ) : activeTab === 1 ? (
             <div className="flex flex-col gap-4">
               {/* KD / MACD / 綜合訊號：有資料才顯示 */}
