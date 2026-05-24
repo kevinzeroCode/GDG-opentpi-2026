@@ -79,16 +79,28 @@ async def test_fetch_increments_redis_quota_on_success(mock_redis):
     mock_redis.expire.assert_called_once()
 
 
-async def test_fetch_raises_quota_exceeded_at_threshold(mock_redis):
+async def test_fetch_switches_to_digirunner_when_threshold_reached(mock_redis):
     mock_redis.get = AsyncMock(return_value="550")
 
-    with patch("app.services.finmind_client.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+    with (
+        patch("app.services.finmind_client.get_redis", new_callable=AsyncMock, return_value=mock_redis),
+        patch("app.services.finmind_client.settings") as mock_settings,
+        patch("httpx.AsyncClient") as mock_client,
+    ):
+        mock_settings.finmind_token = ""
+        mock_settings.finmind_url = "https://example.test/finmind"
+        mock_settings.digirunner_service_url = "http://gateway.test:18080"
+        _mock_client_get(mock_client).return_value = _response(payload={"status": 200, "data": []})
+
         from app.services import finmind_client
 
-        with pytest.raises(finmind_client.QuotaExceededError):
-            await finmind_client.fetch("TaiwanStockPrice", "2330", "2026-01-01")
+        result = await finmind_client.fetch("TaiwanStockPrice", "2330", "2026-01-01")
 
-    mock_redis.incr.assert_not_called()
+    assert result == []
+    call = _mock_client_get(mock_client).call_args
+    assert call.args[0] == "http://gateway.test:18080/finmind/api/v4/data"
+    mock_redis.incr.assert_called_once()
+    mock_redis.expire.assert_called_once()
 
 
 async def test_fetch_retries_on_429_then_succeeds_and_counts_each_response(mock_redis):
@@ -170,6 +182,7 @@ async def test_get_quota_status_returns_zero_when_no_usage(mock_redis):
     assert status["limit"] == 600
     assert status["remaining"] == 600
     assert "date" in status
+    assert status["source"] == "finmind"
 
 
 async def test_get_quota_status_calculates_remaining(mock_redis):
@@ -182,3 +195,15 @@ async def test_get_quota_status_calculates_remaining(mock_redis):
 
     assert status["used"] == 42
     assert status["remaining"] == 558
+    assert status["source"] == "finmind"
+
+
+async def test_get_quota_status_marks_digirunner_fallback_when_threshold_reached(mock_redis):
+    mock_redis.get = AsyncMock(return_value="550")
+
+    with patch("app.services.finmind_client.get_redis", new_callable=AsyncMock, return_value=mock_redis):
+        from app.services import finmind_client
+
+        status = await finmind_client.get_quota_status()
+
+    assert status["source"] == "digirunner"

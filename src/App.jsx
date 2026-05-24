@@ -688,9 +688,12 @@ const FinMindQuotaCard = ({ quota, loading, error, onRefresh }) => {
   const limit = quota?.limit ?? 600;
   const remaining = quota?.remaining ?? limit;
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const fallbackActive = quota?.source === 'digirunner';
   const status =
-    used >= 550
-      ? { label: 'Paused', color: 'text-red-300', bar: 'bg-red-500', border: 'border-red-700/50', bg: 'bg-red-950/30' }
+    fallbackActive
+      ? { label: 'DigiRunner fallback', color: 'text-sky-300', bar: 'bg-sky-400', border: 'border-sky-700/50', bg: 'bg-sky-950/20' }
+      : used >= 550
+        ? { label: 'Paused', color: 'text-red-300', bar: 'bg-red-500', border: 'border-red-700/50', bg: 'bg-red-950/30' }
       : used >= 500
         ? { label: 'Near limit', color: 'text-amber-300', bar: 'bg-amber-400', border: 'border-amber-700/50', bg: 'bg-amber-950/20' }
         : { label: 'Ready', color: 'text-emerald-300', bar: 'bg-emerald-400', border: 'border-emerald-700/40', bg: 'bg-emerald-950/10' };
