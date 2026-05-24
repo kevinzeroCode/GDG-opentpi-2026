@@ -4,18 +4,15 @@ import threading
 from datetime import date, timedelta, datetime as dt
 from datetime import datetime, timezone
 from typing import Any
-import httpx
 import asyncpg
-from app.config import settings
 from app.services.db_service import get_pool, save_etl_run, get_last_etl_run
+from app.services.finmind_client import QuotaExceededError
 
 logger = logging.getLogger(__name__)
 _last_run_lock = threading.Lock()
 
 # 預設追蹤股票清單（會與 watchlist 合併）
 DEFAULT_TICKERS = ["2330", "2317", "2454", "2412", "2308"]
-
-FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 
 # 最後一次執行的狀態
 _last_run: dict[str, Any] = {
@@ -44,24 +41,10 @@ async def _get_last_date(pool: asyncpg.Pool, ticker: str) -> str:
 
 
 async def _fetch_finmind(ticker: str, start_date: str) -> list[dict]:
-    """從 FinMind API 抓取單支股票資料。"""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            FINMIND_URL,
-            params={
-                "dataset": "TaiwanStockPrice",
-                "data_id": ticker,
-                "start_date": start_date,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    """Fetch stock prices from FinMind through the centralized client."""
+    from app.services.finmind_client import fetch
 
-    if data.get("status") != 200:
-        raise ValueError(f"FinMind 回傳錯誤：{data.get('msg', 'unknown')}")
-
-    return data.get("data", [])
-
+    return await fetch("TaiwanStockPrice", ticker, start_date)
 
 async def _insert_rows(pool: asyncpg.Pool, ticker: str, rows: list[dict]) -> int:
     """批次寫入 stock_history，已存在的資料跳過。"""
@@ -158,6 +141,11 @@ async def run_etl(manual: bool = False) -> dict:
             # 避免打太快被 FinMind 限流
             await asyncio.sleep(0.5)
 
+        except QuotaExceededError as e:
+            msg = f"FinMind quota exceeded: {e}"
+            errors.append(msg)
+            print(f"  !! {msg}")
+            break
         except Exception as e:
             msg = f"{ticker}: {e}"
             errors.append(msg)

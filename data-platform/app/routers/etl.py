@@ -12,6 +12,7 @@ from app.services.chips_service import (
     get_last_run_status as get_chips_status,
     _last_run as _chips_last_run,
 )
+from app.services.finmind_client import get_quota_status
 
 router = APIRouter(prefix="/api/etl", tags=["etl"])
 
@@ -29,6 +30,12 @@ async def trigger_sync(background_tasks: BackgroundTasks):
 async def get_status():
     """查詢最後一次股價 ETL 執行結果。"""
     return await get_last_run_status()
+
+
+@router.get("/quota")
+async def get_finmind_quota():
+    """Return today's FinMind API quota usage."""
+    return await get_quota_status()
 
 
 @router.get("/tickers")

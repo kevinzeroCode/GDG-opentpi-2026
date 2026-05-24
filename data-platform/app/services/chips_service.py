@@ -3,16 +3,14 @@ import logging
 import threading
 from datetime import datetime, timezone, timedelta
 from typing import Any
-import httpx
 import asyncpg
 from app.services.db_service import get_pool
+from app.services.finmind_client import QuotaExceededError
 
 logger = logging.getLogger(__name__)
 _last_run_lock = threading.Lock()
 
 DEFAULT_TICKERS = ["2330", "2317", "2454", "2412", "2308"]
-FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
-
 _last_run: dict[str, Any] = {
     "status": "never",
     "started_at": None,
@@ -36,18 +34,10 @@ async def _get_last_chips_date(pool: asyncpg.Pool, ticker: str, table: str) -> s
 
 
 async def _fetch_finmind(dataset: str, ticker: str, start_date: str) -> list[dict]:
-    from app.config import settings
-    params: dict = {"dataset": dataset, "data_id": ticker, "start_date": start_date}
-    if settings.finmind_token:
-        params["token"] = settings.finmind_token
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.get(FINMIND_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
-    if data.get("status") != 200:
-        raise ValueError(f"FinMind 回傳錯誤：{data.get('msg', 'unknown')}")
-    return data.get("data", [])
+    """Fetch FinMind data through the centralized client."""
+    from app.services.finmind_client import fetch
 
+    return await fetch(dataset, ticker, start_date)
 
 async def _insert_institutional_rows(pool: asyncpg.Pool, rows: list[dict]) -> int:
     if not rows:
@@ -153,6 +143,11 @@ async def run_chips_etl(manual: bool = False) -> dict:
                 inserted = await _insert_institutional_rows(pool, rows)
                 total_rows += inserted
                 print(f"  ✅ {ticker} 三大法人：新增 {inserted} 筆")
+        except QuotaExceededError as e:
+            msg = f"FinMind quota exceeded: {e}"
+            errors.append(msg)
+            print(f"  !! {msg}")
+            break
         except Exception as e:
             msg = f"{ticker} 三大法人: {e}"
             errors.append(msg)
@@ -168,6 +163,11 @@ async def run_chips_etl(manual: bool = False) -> dict:
                 inserted = await _insert_margin_rows(pool, rows)
                 total_rows += inserted
                 print(f"  ✅ {ticker} 融資融券：新增 {inserted} 筆")
+        except QuotaExceededError as e:
+            msg = f"FinMind quota exceeded: {e}"
+            errors.append(msg)
+            print(f"  !! {msg}")
+            break
         except Exception as e:
             msg = f"{ticker} 融資融券: {e}"
             errors.append(msg)

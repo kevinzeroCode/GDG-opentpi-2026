@@ -190,6 +190,29 @@ function App() {
   const { data: liveData, error: liveError } = useTWSELive(lastTicker);
 
   const [alertServiceStatus, setAlertServiceStatus] = useState('ok'); // 'ok' | 'error'
+  const [finmindQuota, setFinmindQuota] = useState(null);
+  const [finmindQuotaLoading, setFinmindQuotaLoading] = useState(false);
+  const [finmindQuotaError, setFinmindQuotaError] = useState('');
+
+  const fetchFinMindQuota = async () => {
+    setFinmindQuotaLoading(true);
+    setFinmindQuotaError('');
+    try {
+      const res = await fetch('/api/etl/quota');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setFinmindQuota(await res.json());
+    } catch (e) {
+      setFinmindQuotaError(e.message || 'Unable to load FinMind quota');
+    } finally {
+      setFinmindQuotaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFinMindQuota();
+    const id = setInterval(fetchFinMindQuota, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   // 背景自動輪詢：每 2 秒對所有有 PRICE 警報的股票查詢即時價格並比對
   useEffect(() => {
@@ -511,6 +534,12 @@ function App() {
               </button>
             ))}
           </div>
+          <FinMindQuotaCard
+            quota={finmindQuota}
+            loading={finmindQuotaLoading}
+            error={finmindQuotaError}
+            onRefresh={fetchFinMindQuota}
+          />
         </div>
 
         {/* Tab Content */}
@@ -653,6 +682,49 @@ const INDICATORS = [
   { value: 'macd', label: 'MACD' },
   { value: 'price', label: '價格' },
 ];
+
+const FinMindQuotaCard = ({ quota, loading, error, onRefresh }) => {
+  const used = quota?.used ?? 0;
+  const limit = quota?.limit ?? 600;
+  const remaining = quota?.remaining ?? limit;
+  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const status =
+    used >= 550
+      ? { label: 'Paused', color: 'text-red-300', bar: 'bg-red-500', border: 'border-red-700/50', bg: 'bg-red-950/30' }
+      : used >= 500
+        ? { label: 'Near limit', color: 'text-amber-300', bar: 'bg-amber-400', border: 'border-amber-700/50', bg: 'bg-amber-950/20' }
+        : { label: 'Ready', color: 'text-emerald-300', bar: 'bg-emerald-400', border: 'border-emerald-700/40', bg: 'bg-emerald-950/10' };
+
+  return (
+    <div className={`mt-3 rounded-xl border ${status.border} ${status.bg} px-3 py-2`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase font-semibold tracking-wide text-slate-500">
+            <Activity size={12} />
+            <span>FinMind API</span>
+            <span className={status.color}>{error ? 'Unavailable' : status.label}</span>
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-sm font-bold font-mono text-slate-100">{used}/{limit}</span>
+            <span className="text-[10px] text-slate-500">{remaining} remaining</span>
+          </div>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh FinMind quota"
+          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 text-slate-400 hover:text-white transition-colors"
+        >
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+      <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+        <div className={`h-full rounded-full ${error ? 'bg-slate-600' : status.bar}`} style={{ width: `${pct}%` }} />
+      </div>
+      {error && <div className="mt-1 text-[10px] text-red-300">{error}</div>}
+    </div>
+  );
+};
 
 const AlertPanel = ({ ticker, alerts, triggeredAlerts, serviceStatus, onAdd, onRemove, onReset }) => {
   const [alertTicker, setAlertTicker] = useState(ticker || '');

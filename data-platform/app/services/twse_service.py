@@ -73,15 +73,8 @@ async def fetch_live(ticker: str) -> dict:
 
 
 async def fetch_candles(ticker: str, start_date: str) -> dict:
-    """直接呼叫 FinMind 公開 API，回傳 K 線原始格式。"""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            settings.finmind_url,
-            params={
-                "dataset": "TaiwanStockPrice",
-                "data_id": ticker,
-                "start_date": start_date,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()
+    """Fetch raw candle rows through the centralized FinMind client."""
+    from app.services.finmind_client import fetch
+
+    data = await fetch("TaiwanStockPrice", ticker, start_date)
+    return {"status": 200, "data": data}

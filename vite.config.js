@@ -25,6 +25,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/gnews\/?/, '/rss/search'),
         },
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
         '/finmind': {
           target: 'https://api.finmindtrade.com',
           changeOrigin: true,

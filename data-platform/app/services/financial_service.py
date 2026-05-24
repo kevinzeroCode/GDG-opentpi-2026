@@ -3,16 +3,14 @@ import logging
 import threading
 from datetime import datetime, timezone, timedelta
 from typing import Any
-import httpx
 import asyncpg
 from app.services.db_service import get_pool
+from app.services.finmind_client import QuotaExceededError
 
 logger = logging.getLogger(__name__)
 _last_run_lock = threading.Lock()
 
 DEFAULT_TICKERS = ["2330", "2317", "2454", "2412", "2308"]
-FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
-
 _last_run: dict[str, Any] = {
     "status": "never",
     "started_at": None,
@@ -48,17 +46,10 @@ async def _get_last_revenue_date(pool: asyncpg.Pool, ticker: str) -> str:
 
 
 async def _fetch_finmind(dataset: str, ticker: str, start_date: str) -> list[dict]:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(
-            FINMIND_URL,
-            params={"dataset": dataset, "data_id": ticker, "start_date": start_date},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    if data.get("status") != 200:
-        raise ValueError(f"FinMind 回傳錯誤：{data.get('msg', 'unknown')}")
-    return data.get("data", [])
+    """Fetch FinMind data through the centralized client."""
+    from app.services.finmind_client import fetch
 
+    return await fetch(dataset, ticker, start_date)
 
 async def _insert_stmt_rows(pool: asyncpg.Pool, rows: list[dict]) -> int:
     if not rows:
@@ -151,6 +142,11 @@ async def run_financial_etl(manual: bool = False) -> dict:
                 inserted = await _insert_stmt_rows(pool, rows)
                 total_rows += inserted
                 print(f"  ✅ {ticker} 財務報表：新增 {inserted} 筆")
+        except QuotaExceededError as e:
+            msg = f"FinMind quota exceeded: {e}"
+            errors.append(msg)
+            print(f"  !! {msg}")
+            break
         except Exception as e:
             msg = f"{ticker} 財務報表: {e}"
             errors.append(msg)
@@ -166,6 +162,11 @@ async def run_financial_etl(manual: bool = False) -> dict:
                 inserted = await _insert_revenue_rows(pool, rows)
                 total_rows += inserted
                 print(f"  ✅ {ticker} 月營收：新增 {inserted} 筆")
+        except QuotaExceededError as e:
+            msg = f"FinMind quota exceeded: {e}"
+            errors.append(msg)
+            print(f"  !! {msg}")
+            break
         except Exception as e:
             msg = f"{ticker} 月營收: {e}"
             errors.append(msg)
