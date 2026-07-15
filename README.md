@@ -11,6 +11,16 @@
 
 **線上展示：** https://quant-opentpi.duckdns.org
 
+<p align="center">
+  <a href="https://github.com/TPIsoftwareOSPO/digiRunner-Open-Source/discussions/140">
+    <img src="https://raw.githubusercontent.com/TPIsoftwareOSPO/digiRunner-Open-Source/main/Badges_Assets/02-Project%20Builder%20Badge.svg" height="120" alt="OpenTPI Project Builder Badge"/>
+  </a>
+  <br/>
+  <b>🎖️ OpenTPI Project Builder Badge</b> —
+  以 OpenTPI 開源軟體打造本專案並回饋社群而獲頒 ·
+  <a href="https://github.com/TPIsoftwareOSPO/digiRunner-Open-Source/blob/main/Community_Badges.md">OpenTPI Community</a>
+</p>
+
 ---
 
 ## 系統架構
