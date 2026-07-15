@@ -5,6 +5,7 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+[![OpenTPI Project Builder Badge](https://raw.githubusercontent.com/TPIsoftwareOSPO/digiRunner-Open-Source/main/Badges_Assets/02-Project%20Builder%20Badge.svg)](https://github.com/TPIsoftwareOSPO/digiRunner-Open-Source/blob/main/Community_Badges.md)
 
 > 基於 **React + Vite** 前端、**FastAPI** 數據中台、**Dify.ai Cloud** AI 引擎的全端台股量化分析平台。
 > 支援使用者系統、AI 多輪對話、即時技術指標分析、K 線 cache-aside、每日自動 ETL。
